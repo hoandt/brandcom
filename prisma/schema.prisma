@@ -1,0 +1,135 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Product {
+  id          String           @id @default(cuid())
+  name        String
+  slug        String           @unique
+  description String?
+  status      ProductStatus    @default(DRAFT)
+  images      ProductImage[]
+  variants    ProductVariant[]
+  categories  Category[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  description String?
+  products    Product[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model ProductImage {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  url       String
+  alt       String?
+  position  Int      @default(0)
+}
+
+model ProductVariant {
+  id           String   @id @default(cuid())
+  productId    String
+  product      Product  @relation(fields: [productId], references: [id])
+
+  sku          String   @unique
+  name         String
+  price        Decimal
+  comparePrice Decimal?
+  costPrice    Decimal?
+  saleStartDate DateTime?
+  saleEndDate   DateTime?
+  stock        Int      @default(0)
+  isActive     Boolean  @default(true)
+}
+
+model Order {
+  id            String      @id @default(cuid())
+  orderNumber   String      @unique
+  customerName  String
+  customerPhone String
+  customerEmail String?
+  address       String
+  subtotal      Decimal
+  shippingFee   Decimal
+  discount      Decimal     @default(0)
+  totalAmount   Decimal
+  paymentMethod String
+  paymentStatus String
+  orderStatus   String
+  trackingCode  String?
+  swifthubId    String?
+  items         OrderItem[]
+  coupons       Coupon[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model OrderItem {
+  id          String @id @default(cuid())
+  orderId     String
+  order       Order  @relation(fields: [orderId], references: [id])
+
+  variantId   String
+  sku         String
+  productName String
+  variantName String?
+  price       Decimal
+  quantity    Int
+}
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String?
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Coupon {
+  id            String     @id @default(cuid())
+  code          String     @unique
+  type          CouponType 
+  value         Decimal    // Discount amount or percentage (0 for FREE_SHIPPING)
+  minOrderValue Decimal?   // Optional minimum subtotal required
+  maxUsage      Int?       // Max number of times this coupon can be used overall
+  usedCount     Int        @default(0)
+  validFrom     DateTime?
+  validTo       DateTime?
+  isActive      Boolean    @default(true)
+  
+  orders        Order[]
+  
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+}
+
+enum CouponType {
+  PERCENTAGE
+  FIXED
+  FREE_SHIPPING
+}
