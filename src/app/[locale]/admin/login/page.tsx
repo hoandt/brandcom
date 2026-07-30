@@ -3,8 +3,14 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { AuthError } from "next-auth"
+import { redirect } from "next/navigation"
 
-export default function LoginPage() {
+export default async function LoginPage(props: {
+  searchParams: Promise<{ error?: string }>
+}) {
+  const searchParams = await props.searchParams;
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
       <Card className="w-full max-w-sm">
@@ -15,10 +21,27 @@ export default function LoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {searchParams.error === "CredentialsSignin" && (
+            <div className="bg-destructive/15 text-destructive text-xs p-3 rounded-md mb-4 text-center border border-destructive/20 font-medium">
+              Invalid email or password
+            </div>
+          )}
           <form
             action={async (formData) => {
               "use server"
-              await signIn("credentials", formData)
+              try {
+                await signIn("credentials", formData)
+              } catch (err) {
+                if (err instanceof AuthError) {
+                  switch (err.type) {
+                    case "CredentialsSignin":
+                      redirect("?error=CredentialsSignin")
+                    default:
+                      redirect("?error=Default")
+                  }
+                }
+                throw err
+              }
             }}
             className="grid gap-4"
           >

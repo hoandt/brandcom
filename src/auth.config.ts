@@ -12,11 +12,19 @@ export const authConfig = {
       const localePrefix = localeMatch ? localeMatch[0] : "";
 
       const isAdminRoute = /^\/(en|vi|th)?\/?admin/.test(pathname);
-      const isAuthPage = /^\/(en|vi|th)?\/?admin\/login/.test(pathname);
+      const isAdminAuthPage = /^\/(en|vi|th)?\/?admin\/login/.test(pathname);
+      const isStoreAuthPage = /^\/(en|vi|th)?\/?(login|register)/.test(pathname);
 
-      if (isAuthPage) {
+      if (isAdminAuthPage) {
         if (isLoggedIn) {
           return Response.redirect(new URL(`${localePrefix}/admin`, nextUrl));
+        }
+        return true;
+      }
+
+      if (isStoreAuthPage) {
+        if (isLoggedIn) {
+          return Response.redirect(new URL(`${localePrefix || '/en'}/account`, nextUrl));
         }
         return true;
       }

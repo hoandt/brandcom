@@ -12,6 +12,12 @@ import {
 
 export default async function AdminProductsPage() {
   const products = await prisma.product.findMany({
+    include: {
+      images: {
+        orderBy: { position: "asc" },
+        take: 1,
+      },
+    },
     orderBy: { createdAt: 'desc' }
   })
 
@@ -27,6 +33,7 @@ export default async function AdminProductsPage() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-16">Image</TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Slug</TableHead>
               <TableHead>Status</TableHead>
@@ -36,18 +43,31 @@ export default async function AdminProductsPage() {
           <TableBody>
             {products.length === 0 && (
               <TableRow>
-                <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                   No products found.
                 </TableCell>
               </TableRow>
             )}
             {products.map((product) => (
               <TableRow key={product.id}>
+                <TableCell>
+                  {product.images[0] ? (
+                    <img
+                      src={product.images[0].url}
+                      alt={product.name}
+                      className="w-10 h-10 object-cover rounded-md border border-border"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-md border border-border bg-muted flex items-center justify-center text-[10px] text-muted-foreground uppercase font-light">
+                      None
+                    </div>
+                  )}
+                </TableCell>
                 <TableCell className="font-medium">{product.name}</TableCell>
                 <TableCell>{product.slug}</TableCell>
                 <TableCell>{product.status}</TableCell>
                 <TableCell className="text-right">
-                  <Button variant="ghost" size="sm">Edit</Button>
+                  <Button render={<Link href={`/admin/products/${product.id}/edit`} />} variant="ghost" size="sm">Edit</Button>
                 </TableCell>
               </TableRow>
             ))}

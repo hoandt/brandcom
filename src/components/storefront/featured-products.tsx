@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { Button } from "@/components/ui/button"
+import Image from "next/image"
 import Link from "next/link"
 import { ArrowRight } from "lucide-react"
 import { getTranslations } from "next-intl/server"
@@ -11,7 +12,13 @@ export async function FeaturedProducts({ locale }: { locale: string }) {
     where: { status: "ACTIVE" },
     take: 4,
     orderBy: { createdAt: 'desc' },
-    include: { variants: true }
+    include: { 
+      variants: true,
+      images: {
+        orderBy: { position: 'asc' },
+        take: 1
+      }
+    }
   })
 
   return (
@@ -27,22 +34,34 @@ export async function FeaturedProducts({ locale }: { locale: string }) {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-        {products.map((product) => (
-          <Link key={product.id} href={`/${locale}/products/${product.slug}`} className="group flex flex-col gap-4">
-            <div className="aspect-[4/5] bg-secondary overflow-hidden relative border border-transparent hover:border-border transition-colors">
-              {/* Placeholder for image */}
-              <div className="absolute inset-0 bg-secondary flex items-center justify-center transition-transform duration-700 group-hover:scale-105">
-                 <span className="text-muted-foreground font-heading uppercase tracking-widest text-xs">{t("imagePlaceholder")}</span>
+        {products.map((product) => {
+          const mainImage = product.images[0]?.url
+          return (
+            <Link key={product.id} href={`/${locale}/products/${product.slug}`} className="group flex flex-col gap-4">
+              <div className="aspect-[4/5] bg-secondary overflow-hidden relative border border-transparent hover:border-border transition-colors">
+                {mainImage ? (
+                  <Image
+                    src={mainImage}
+                    alt={product.name}
+                    fill
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                    className="object-cover transition-transform duration-700 group-hover:scale-105"
+                  />
+                ) : (
+                  <div className="absolute inset-0 bg-secondary flex items-center justify-center transition-transform duration-700 group-hover:scale-105">
+                     <span className="text-muted-foreground font-heading uppercase tracking-widest text-xs">{t("imagePlaceholder")}</span>
+                  </div>
+                )}
               </div>
-            </div>
-            <div className="flex flex-col items-center text-center">
-              <h3 className="font-heading uppercase tracking-wider text-sm">{product.name}</h3>
-              <p className="text-foreground mt-2 font-light text-sm">
-                ${product.variants[0]?.price?.toString() || "0.00"}
-              </p>
-            </div>
-          </Link>
-        ))}
+              <div className="flex flex-col items-center text-center">
+                <h3 className="font-heading uppercase tracking-wider text-sm">{product.name}</h3>
+                <p className="text-foreground mt-2 font-light text-sm">
+                  ${product.variants[0]?.price?.toString() || "0.00"}
+                </p>
+              </div>
+            </Link>
+          )
+        })}
         
         {products.length === 0 && (
           <div className="col-span-full text-center py-32 text-muted-foreground border border-dashed">
