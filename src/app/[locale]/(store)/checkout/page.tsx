@@ -167,7 +167,7 @@ export default function CheckoutPage() {
       <div className="container mx-auto py-24 px-4 flex flex-col items-center text-center max-w-lg">
         <h1 className="text-3xl font-heading uppercase tracking-widest mb-4">{t("thankYou")}</h1>
         <p className="text-foreground/80 font-light mb-8">
-          {t.rich("orderSuccess", { orderId, strong: (chunks) => <strong>{chunks}</strong> })}
+          {t.rich("orderSuccess", { orderId: orderId ?? "", strong: (chunks) => <strong>{chunks}</strong> })}
         </p>
         <Button className="rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/20 uppercase tracking-widest text-xs h-12 px-8 hover:bg-primary/90 transition-all" onClick={() => router.push(`/${locale}`)}>{t("returnToStore")}</Button>
       </div>
