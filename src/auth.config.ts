@@ -1,4 +1,5 @@
 import type { NextAuthConfig } from "next-auth";
+import { isAdminEmail } from "@/lib/admin-access";
 
 export const authConfig = {
   pages: {
@@ -13,11 +14,20 @@ export const authConfig = {
 
       const isAdminRoute = /^\/(en|vi|th)?\/?admin/.test(pathname);
       const isAdminAuthPage = /^\/(en|vi|th)?\/?admin\/login/.test(pathname);
+      const isUnauthorizedPage = /^\/(en|vi|th)?\/?admin\/unauthorized/.test(pathname);
       const isStoreAuthPage = /^\/(en|vi|th)?\/?(login|register)/.test(pathname);
+
+      if (isUnauthorizedPage) {
+        return true;
+      }
 
       if (isAdminAuthPage) {
         if (isLoggedIn) {
-          return Response.redirect(new URL(`${localePrefix}/admin`, nextUrl));
+          if (isAdminEmail(auth?.user?.email)) {
+            return Response.redirect(new URL(`${localePrefix}/admin`, nextUrl));
+          } else {
+            return Response.redirect(new URL(`${localePrefix}/admin/unauthorized`, nextUrl));
+          }
         }
         return true;
       }
@@ -30,8 +40,11 @@ export const authConfig = {
       }
 
       if (isAdminRoute) {
-        if (isLoggedIn) return true;
-        return false; // Redirect unauthenticated users to login page
+        if (isLoggedIn) {
+          if (isAdminEmail(auth?.user?.email)) return true;
+          return Response.redirect(new URL(`${localePrefix}/admin/unauthorized`, nextUrl));
+        }
+        return false; // Redirect unauthorized users to login page
       }
 
       return true;

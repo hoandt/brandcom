@@ -12,6 +12,59 @@ datasource db {
   provider = "postgresql"
 }
 
+model StoreSettings {
+  id                  String   @id @default(cuid())
+  tenantId            String   @unique
+  storeName           String
+  legalName           String?
+  tagline             String?
+  supportEmail        String?
+  supportPhone        String?
+  defaultLocale       String   @default("vi")
+  currency            String   @default("VND")
+  timezone            String   @default("Asia/Ho_Chi_Minh")
+  orderPrefix         String   @default("ORD")
+  fallbackShippingFee Int      @default(30000)
+  lowStockThreshold   Int      @default(5)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model CarrierSettings {
+  id                            String   @id @default(cuid())
+  tenantId                      String
+  carrier                       String
+  enabled                       Boolean  @default(true)
+  serviceType                   Int      @default(1)
+  senderCountry                 String   @default("VN")
+  senderName                    String?
+  senderPhone                   String?
+  paymentRole                   Int      @default(1)
+  codCollection                 Int      @default(0)
+  defaultCodAmount              Int      @default(0)
+  highValueProcessingCollection Int      @default(0)
+  collectType                   Int      @default(2)
+  pickupLeadTimeMinutes         Int      @default(60)
+  pickupTimeRangeId             Int?
+  allowMutualCheck              Int      @default(1)
+  allowTryOn                    Int      @default(1)
+  voucherCode                   String?
+  parcelWeightPerItem           Float    @default(0.2)
+  minimumParcelWeight           Float    @default(1)
+  parcelLength                  Float    @default(12)
+  parcelWidth                   Float    @default(12)
+  parcelHeight                  Float    @default(6)
+  parcelItemName                String   @default("default")
+  expressInsuredValue           Int      @default(0)
+  vasTypes                      String[] @default([])
+  collectFeeAmount              Int      @default(0)
+  defaultDeliverInstruction     String?
+  createdAt                     DateTime @default(now())
+  updatedAt                     DateTime @updatedAt
+
+  @@unique([tenantId, carrier])
+}
+
 model Product {
   id          String           @id @default(cuid())
   name        String
@@ -39,57 +92,67 @@ model Category {
 }
 
 model ProductImage {
-  id        String   @id @default(cuid())
+  id        String  @id @default(cuid())
   productId String
-  product   Product  @relation(fields: [productId], references: [id])
+  product   Product @relation(fields: [productId], references: [id])
   url       String
   alt       String?
-  position  Int      @default(0)
+  position  Int     @default(0)
 }
 
 model ProductVariant {
-  id           String   @id @default(cuid())
-  productId    String
-  product      Product  @relation(fields: [productId], references: [id])
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
 
-  sku          String   @unique
-  name         String
-  price        Decimal
-  comparePrice Decimal?
-  costPrice    Decimal?
+  sku           String               @unique
+  name          String
+  price         Decimal
+  comparePrice  Decimal?
+  costPrice     Decimal?
   saleStartDate DateTime?
   saleEndDate   DateTime?
-  stock        Int      @default(0)
-  isActive     Boolean  @default(true)
-  imageUrl     String?
+  stock         Int                  @default(0)
+  isActive      Boolean              @default(true)
+  imageUrl      String?
+  inventories   WarehouseInventory[]
 }
 
 model Order {
-  id            String      @id @default(cuid())
-  orderNumber   String      @unique
-  customerName  String
-  customerPhone String
-  customerEmail String?
-  address       String
-  subtotal      Decimal
-  shippingFee   Decimal
-  discount      Decimal     @default(0)
-  totalAmount   Decimal
-  paymentMethod String
-  paymentStatus String
-  orderStatus   String
-  trackingCode  String?
-  swifthubId    String?
-  items         OrderItem[]
-  coupons       Coupon[]
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  id               String      @id @default(cuid())
+  orderNumber      String      @unique
+  userId           String?
+  user             User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  customerName     String
+  customerPhone    String
+  customerEmail    String?
+  address          String
+  subtotal         Decimal
+  shippingFee      Decimal
+  discount         Decimal     @default(0)
+  totalAmount      Decimal
+  paymentMethod    String
+  paymentStatus    String
+  orderStatus      String
+  trackingCode     String?
+  swifthubId       String?
+  latitude         Float?
+  longitude        Float?
+  items            OrderItem[]
+  coupons          Coupon[]
+  voucherId        String?
+  voucherCode      String?
+  voucherName      String?
+  cartDiscount     Decimal?    @default(0)
+  shippingDiscount Decimal?    @default(0)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
 }
 
 model OrderItem {
-  id          String @id @default(cuid())
-  orderId     String
-  order       Order  @relation(fields: [orderId], references: [id])
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id])
 
   variantId   String
   sku         String
@@ -97,6 +160,7 @@ model OrderItem {
   variantName String?
   price       Decimal
   quantity    Int
+  allocations OrderItemInventoryAllocation[]
 }
 
 enum ProductStatus {
@@ -110,27 +174,30 @@ model User {
   name          String?
   email         String?   @unique
   emailVerified DateTime?
+  phone         String?
   image         String?
   password      String?
   accounts      Account[]
   sessions      Session[]
+  addresses     Address[]
+  orders        Order[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
 
 model Account {
-  id                 String  @id @default(cuid())
-  userId             String
-  type               String
-  provider           String
-  providerAccountId  String
-  refresh_token      String?  @db.Text
-  access_token       String?  @db.Text
-  expires_at         Int?
-  token_type         String?
-  scope              String?
-  id_token           String?  @db.Text
-  session_state      String?
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -156,23 +223,149 @@ model VerificationToken {
 model Coupon {
   id            String     @id @default(cuid())
   code          String     @unique
-  type          CouponType 
-  value         Decimal    // Discount amount or percentage (0 for FREE_SHIPPING)
-  minOrderValue Decimal?   // Optional minimum subtotal required
-  maxUsage      Int?       // Max number of times this coupon can be used overall
+  type          CouponType
+  value         Decimal // Discount amount or percentage (0 for FREE_SHIPPING)
+  minOrderValue Decimal? // Optional minimum subtotal required
+  maxUsage      Int? // Max number of times this coupon can be used overall
   usedCount     Int        @default(0)
   validFrom     DateTime?
   validTo       DateTime?
   isActive      Boolean    @default(true)
-  
-  orders        Order[]
-  
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+
+  orders Order[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 enum CouponType {
   PERCENTAGE
   FIXED
   FREE_SHIPPING
+}
+
+model Page {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  title     Json // { "en": "...", "vi": "...", "th": "..." }
+  content   Json // { "en": "...", "vi": "...", "th": "..." }
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Address {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String
+  phone        String
+  address      String
+  provinceId   String
+  provinceName String
+  districtId   String
+  districtName String
+  wardId       String
+  wardName     String
+  latitude     Float?
+  longitude    Float?
+  isDefault    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Warehouse {
+  id           String                         @id @default(cuid())
+  name         String
+  code         String                         @unique
+  contactName  String
+  phone        String
+  address      String
+  provinceId   String
+  provinceName String
+  districtId   String
+  districtName String
+  wardId       String
+  wardName     String
+  spxProvince  String?
+  spxDistrict  String?
+  spxWard      String?
+  latitude     Float?
+  longitude    Float?
+  isDefault    Boolean                        @default(false)
+  isActive     Boolean                        @default(true)
+  isPickup     Boolean                        @default(true)
+  isReturn     Boolean                        @default(true)
+  createdAt    DateTime                       @default(now())
+  updatedAt    DateTime                       @updatedAt
+  inventories  WarehouseInventory[]
+  allocations  OrderItemInventoryAllocation[]
+}
+
+model WarehouseInventory {
+  id          String         @id @default(cuid())
+  warehouseId String
+  warehouse   Warehouse      @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  variantId   String
+  variant     ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  quantity    Int            @default(0)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@unique([warehouseId, variantId])
+  @@index([variantId])
+}
+
+model OrderItemInventoryAllocation {
+  id          String    @id @default(cuid())
+  orderItemId String
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  warehouseId String
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  quantity    Int
+  createdAt   DateTime  @default(now())
+
+  @@unique([orderItemId, warehouseId])
+  @@index([warehouseId])
+}
+
+model Voucher {
+  id                  String         @id @default(cuid())
+  tenantId            String
+  name                String
+  description         String?
+  code                String
+  status              String // "draft" | "active" | "paused"
+  startsAt            DateTime
+  endsAt              DateTime
+  minimumCartSubtotal Int?
+  benefit             Json // VoucherBenefit JSON payload
+  productIds          String[] // Empty = all products; non-empty = product-scoped
+  totalUsageLimit     Int?
+  usagePerCustomer    Int?
+  consumedQuantity    Int            @default(0)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  usages              VoucherUsage[]
+
+  @@unique([tenantId, code])
+}
+
+model VoucherUsage {
+  id               String    @id @default(cuid())
+  tenantId         String
+  voucherId        String
+  voucher          Voucher   @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  customerId       String?
+  orderId          String
+  cartDiscount     Int
+  shippingDiscount Int
+  totalDiscount    Int
+  status           String // "applied" | "reversed"
+  idempotencyKey   String    @unique
+  createdAt        DateTime  @default(now())
+  reversedAt       DateTime?
+
+  @@index([tenantId, voucherId])
+  @@index([customerId])
 }

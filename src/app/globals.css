@@ -49,14 +49,14 @@
 }
 
 :root {
-  --background: hsl(20, 100%, 99%);
-  --foreground: hsl(351, 12%, 22%);
+  --background: hsl(350, 60%, 97%);
+  --foreground: hsl(30, 10%, 15%);
 
   --card: hsl(0, 0%, 100%);
-  --card-foreground: hsl(351, 12%, 22%);
+  --card-foreground: hsl(351, 12%, 12%);
 
   --popover: hsl(0, 0%, 100%);
-  --popover-foreground: hsl(351, 12%, 22%);
+  --popover-foreground: hsl(351, 12%, 12%);
 
   --primary: hsl(354, 70%, 39%);
   --primary-foreground: hsl(0, 0%, 100%);
@@ -65,7 +65,7 @@
   --secondary-foreground: hsl(351, 20%, 27%);
 
   --muted: hsl(0, 27%, 96%);
-  --muted-foreground: hsl(348, 8%, 46%);
+  --muted-foreground: hsl(348, 8%, 28%);
 
   --accent: hsl(352, 48%, 94%);
   --accent-foreground: hsl(354, 70%, 34%);
@@ -115,9 +115,32 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-normal antialiased;
+    background-image:
+      radial-gradient(circle at 50% -20%, hsl(40, 50%, 99%) 0%, transparent 70%),
+      radial-gradient(circle at 100% 100%, hsl(15, 30%, 96%) 0%, transparent 60%);
+    background-attachment: fixed;
   }
   html {
     @apply font-sans;
+  }
+
+  /* Global contrast boost: prevent text from being too thin or light gray */
+  .font-light, font-light {
+    font-weight: 400 !important;
+  }
+  .text-muted-foreground {
+    color: var(--color-muted-foreground) !important;
+  }
+
+  /* Remove default Chrome/Safari light blue autofill background */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active {
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: currentColor !important;
+    transition: background-color 5000s ease-in-out 0s;
+    box-shadow: inset 0 0 20px 20px transparent !important;
   }
 }

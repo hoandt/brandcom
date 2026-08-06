@@ -1,0 +1,201 @@
+import { NextResponse } from 'next/server';
+import { checkSPXShippingFee, SPXOrder } from '@/lib/shipping/spx';
+import { prisma } from '@/lib/prisma';
+import { getStoreSettings } from '@/lib/store-settings';
+import { getSPXSettings, SPX_CARRIER } from '@/lib/shipping/settings';
+
+export async function POST(req: Request) {
+  try {
+    const body = await req.json();
+    const { location, items, recipient } = body;
+    const [storeSettings, carrierSettings] = await Promise.all([
+      getStoreSettings(),
+      getSPXSettings(),
+    ]);
+
+    if (!carrierSettings.enabled) {
+      return NextResponse.json(
+        {
+          error: 'SPX shipping is disabled',
+          carrier: SPX_CARRIER,
+          fallbackFee: storeSettings.fallbackShippingFee,
+        },
+        { status: 503 }
+      );
+    }
+
+    if (!location || !location.province || !location.district || !location.ward) {
+      return NextResponse.json(
+        { error: 'Incomplete destination address' },
+        { status: 400 }
+      );
+    }
+
+    if (!items || !items.length) {
+      return NextResponse.json(
+        { error: 'Cart is empty' },
+        { status: 400 }
+      );
+    }
+
+    // Default sender location (Your store location)
+    // SPX requires exact valid Province, District, and Ward names.
+    const warehouse = await prisma.warehouse.findFirst({
+      where: { isDefault: true, isActive: true, isPickup: true },
+    });
+    const senderProvince = warehouse?.spxProvince || warehouse?.provinceName || process.env.SPX_SENDER_STATE || 'TP. Hồ Chí Minh';
+    const senderDistrict = warehouse?.spxDistrict || warehouse?.districtName || process.env.SPX_SENDER_CITY || 'Quận 1';
+    const senderWard = warehouse?.spxWard || warehouse?.wardName || process.env.SPX_SENDER_DISTRICT || 'Phường Bến Nghé';
+    const senderDetailAddress = warehouse?.address || process.env.SPX_SENDER_DETAIL_ADDRESS || senderWard;
+
+    const totalQuantity = items.reduce((acc: number, item: { quantity?: number }) => acc + (item.quantity || 1), 0);
+    const parcelWeight = Math.max(
+      carrierSettings.minimumParcelWeight,
+      totalQuantity * carrierSettings.parcelWeightPerItem
+    );
+
+    const sanitizeSPXLocation = (name: string) => {
+      if (!name) return '';
+      if (name.toLowerCase() === 'thành phố hồ chí minh' || name.toLowerCase() === 'tp hồ chí minh' || name.toLowerCase() === 'ho chi minh') {
+        return 'TP. Hồ Chí Minh';
+      }
+      return name;
+    };
+
+    const locationName = (value: unknown) =>
+      typeof value === 'string'
+        ? value
+        : (value as { name?: string } | null | undefined)?.name || '';
+
+    const spxProvince = sanitizeSPXLocation(locationName(location.province));
+    let spxDistrict = sanitizeSPXLocation(locationName(location.district));
+    if (spxDistrict.toLowerCase().includes('thủ đức')) spxDistrict = 'Thành Phố Thủ Đức';
+
+    const order: Omit<SPXOrder, 'user_id' | 'user_secret'> = {
+      order_id: '1',
+      base_info: {
+        service_type: carrierSettings.serviceType,
+      },
+      fulfillment_info: {
+        payment_role: carrierSettings.paymentRole,
+        cod_collection: carrierSettings.codCollection,
+        cod_amount: carrierSettings.defaultCodAmount,
+        high_value_processing_collection: carrierSettings.highValueProcessingCollection,
+        collect_type: carrierSettings.collectType,
+        allow_mutual_check: carrierSettings.allowMutualCheck,
+        allow_try_on: carrierSettings.allowTryOn,
+        ...(carrierSettings.collectType === 1
+          ? { pickup_time: Math.floor(Date.now() / 1000) + carrierSettings.pickupLeadTimeMinutes * 60 }
+          : {}),
+        ...(carrierSettings.pickupTimeRangeId != null
+          ? { pickup_time_range_id: carrierSettings.pickupTimeRangeId }
+          : {}),
+        ...(carrierSettings.voucherCode
+          ? { voucher_code: carrierSettings.voucherCode }
+          : {}),
+      },
+      sender_info: {
+        sender_country: carrierSettings.senderCountry,
+        sender_state: senderProvince,
+        sender_city: senderDistrict,
+        sender_district: senderWard,
+        sender_detail_address: senderDetailAddress,
+        ...(warehouse?.contactName || carrierSettings.senderName
+          ? { sender_name: warehouse?.contactName || carrierSettings.senderName || undefined }
+          : {}),
+        ...(warehouse?.phone || carrierSettings.senderPhone
+          ? { sender_phone: warehouse?.phone || carrierSettings.senderPhone || undefined }
+          : {}),
+        ...(process.env.SPX_SENDER_POST_CODE
+          ? { sender_post_code: process.env.SPX_SENDER_POST_CODE }
+          : {}),
+        ...((warehouse?.longitude != null && warehouse?.latitude != null) ||
+        (process.env.SPX_SENDER_LONGITUDE && process.env.SPX_SENDER_LATITUDE)
+          ? {
+              sender_longitude: warehouse?.longitude?.toString() || process.env.SPX_SENDER_LONGITUDE,
+              sender_latitude: warehouse?.latitude?.toString() || process.env.SPX_SENDER_LATITUDE,
+            }
+          : {}),
+      },
+      deliver_info: {
+        deliver_country: carrierSettings.senderCountry,
+        deliver_state: spxProvince,
+        deliver_city: spxDistrict,
+        deliver_district: locationName(location.ward) || spxDistrict,
+        deliver_detail_address:
+          typeof location.detailAddress === 'string' && location.detailAddress.trim()
+            ? location.detailAddress.trim()
+            : locationName(location.ward) || spxDistrict,
+        ...(typeof recipient?.name === 'string' && recipient.name.trim()
+          ? { deliver_name: recipient.name.trim() }
+          : {}),
+        ...(typeof recipient?.phone === 'string' && recipient.phone.trim()
+          ? { deliver_phone: recipient.phone.trim() }
+          : {}),
+        ...(carrierSettings.defaultDeliverInstruction
+          ? { deliver_instruction: carrierSettings.defaultDeliverInstruction }
+          : {}),
+      },
+      parcel_info: {
+        parcel_weight: parcelWeight,
+        parcel_item_name: carrierSettings.parcelItemName,
+        parcel_item_quantity: totalQuantity,
+        parcel_length: carrierSettings.parcelLength,
+        parcel_width: carrierSettings.parcelWidth,
+        parcel_height: carrierSettings.parcelHeight,
+        express_insured_value: carrierSettings.expressInsuredValue,
+      },
+      ...(carrierSettings.vasTypes.length > 0 || carrierSettings.collectFeeAmount > 0
+        ? {
+            vas_info: {
+              vas_types: carrierSettings.vasTypes,
+              collect_fee_amount: carrierSettings.collectFeeAmount,
+            },
+          }
+        : {}),
+    };
+
+    const response = await checkSPXShippingFee([order]);
+
+    if (response.ret_code === 0 && response.data.orders.length > 0) {
+      const shippingFee = response.data.orders[0].estimated_shipping_fee;
+      return NextResponse.json({
+        fee: shippingFee,
+        carrier: SPX_CARRIER,
+        serviceType: carrierSettings.serviceType,
+        parcel: {
+          weight: parcelWeight,
+          length: carrierSettings.parcelLength,
+          width: carrierSettings.parcelWidth,
+          height: carrierSettings.parcelHeight,
+          itemName: carrierSettings.parcelItemName,
+          itemQuantity: totalQuantity,
+        },
+      });
+    } else {
+      console.error('SPX Error Response:', JSON.stringify(response, null, 2));
+      // Fallback in case SPX fails or returns fail_list
+      return NextResponse.json(
+        {
+          error: 'Failed to calculate shipping fee',
+          details: response.message,
+          carrier: SPX_CARRIER,
+          fallbackFee: storeSettings.fallbackShippingFee,
+        },
+        { status: 500 }
+      );
+    }
+  } catch (error: unknown) {
+    console.error('Shipping calculation error:', error);
+    // Returning fallback fee so checkout is not totally blocked
+    const storeSettings = await getStoreSettings().catch(() => null);
+    return NextResponse.json(
+      {
+        error: error instanceof Error ? error.message : 'Internal Server Error',
+        carrier: SPX_CARRIER,
+        fallbackFee: storeSettings?.fallbackShippingFee ?? 30000,
+      },
+      { status: 500 }
+    );
+  }
+}

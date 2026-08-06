@@ -67,7 +67,14 @@ export async function POST(req: Request) {
       }
     }
 
-    // Create the product in database
+    const defaultWarehouse = await prisma.warehouse.findFirst({
+      where: { isActive: true, isPickup: true },
+      orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
+      select: { id: true },
+    });
+
+    // Create the product in database. Legacy new-product stock is assigned to
+    // the default pickup warehouse until the new-product UI uses allocations.
     const product = await prisma.product.create({
       data: {
         name,
@@ -85,14 +92,31 @@ export async function POST(req: Request) {
           })),
         },
         variants: {
-          create: variants.map((v: any) => ({
-            name: v.name || "Default Variant",
-            sku: v.sku,
-            price: v.price,
-            stock: v.stock,
-            imageUrl: v.imageUrl || null,
-            isActive: true,
-          })),
+          create: variants.map((v: any) => {
+            const submittedInventories = Array.isArray(v.inventories)
+              ? v.inventories
+                  .map((inventory: { warehouseId?: string; quantity?: number }) => ({ warehouseId: inventory.warehouseId || "", quantity: Math.max(0, Math.floor(Number(inventory.quantity) || 0)) }))
+                  .filter((inventory: { warehouseId: string; quantity: number }) => inventory.warehouseId && inventory.quantity > 0)
+              : [];
+            const legacyQuantity = Math.max(0, Math.floor(Number(v.stock) || 0));
+            const inventories = submittedInventories.length > 0
+              ? submittedInventories
+              : defaultWarehouse && legacyQuantity > 0
+                ? [{ warehouseId: defaultWarehouse.id, quantity: legacyQuantity }]
+                : [];
+            const quantity = inventories.reduce((sum: number, inventory: { quantity: number }) => sum + inventory.quantity, 0);
+            return {
+              name: v.name || "Default Variant",
+              sku: v.sku,
+              price: v.price,
+              stock: quantity,
+              imageUrl: v.imageUrl || null,
+              isActive: true,
+              inventories: inventories.length > 0
+                ? { create: inventories }
+                : undefined,
+            };
+          }),
         },
       },
     });

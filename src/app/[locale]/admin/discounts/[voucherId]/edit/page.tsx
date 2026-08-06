@@ -1,0 +1,630 @@
+"use client"
+
+import { useState, useEffect } from "react";
+import { useRouter, useParams } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Loader2, Shuffle, X, Search, BarChart3 } from "lucide-react";
+import { toast } from "sonner";
+import { useLocale } from "next-intl";
+
+interface VoucherBenefit {
+  scope: "cart" | "shipping";
+  type: "fixed_amount" | "percentage" | "free_shipping";
+  value?: number;
+  maxDiscountAmount?: number;
+  canCombine?: boolean;
+}
+
+interface Voucher {
+  id: string;
+  tenantId: string;
+  name: string;
+  description?: string | null;
+  code: string;
+  status: "draft" | "active" | "paused";
+  startsAt: string;
+  endsAt: string;
+  minimumCartSubtotal?: number | null;
+  benefit: VoucherBenefit;
+  productIds: string[];
+  totalUsageLimit?: number | null;
+  usagePerCustomer?: number | null;
+  consumedQuantity: number;
+  _count?: { usages: number };
+}
+
+interface ProductItem {
+  id: string;
+  name: string;
+  slug: string;
+  status: string;
+  images: { url: string }[];
+}
+
+function generateCode(length = 8): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "";
+  for (let i = 0; i < length; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
+
+export default function AdminEditVoucherPage() {
+  const router = useRouter();
+  const params = useParams();
+  const locale = useLocale();
+  const voucherId = params.voucherId as string;
+
+  const [loading, setLoading] = useState(false);
+
+  // Form states
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [code, setCode] = useState("");
+  const [status, setStatus] = useState("active");
+  const [startsAt, setStartsAt] = useState("");
+  const [endsAt, setEndsAt] = useState("");
+  const [minimumCartSubtotal, setMinimumCartSubtotal] = useState("");
+  const [totalUsageLimit, setTotalUsageLimit] = useState("");
+  const [usagePerCustomer, setUsagePerCustomer] = useState("");
+
+  // Benefit states
+  const [scope, setScope] = useState<"cart" | "shipping">("cart");
+  const [type, setType] = useState<"fixed_amount" | "percentage" | "free_shipping">("fixed_amount");
+  const [benefitValue, setBenefitValue] = useState("");
+  const [maxDiscountAmount, setMaxDiscountAmount] = useState("");
+  const [canCombine, setCanCombine] = useState(false);
+
+  // Product targeting
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+  const [productSearch, setProductSearch] = useState("");
+  const [showProductPicker, setShowProductPicker] = useState(false);
+
+  const { data, isLoading, isError } = useQuery<{ voucher: Voucher }>({
+    queryKey: ["admin-voucher", voucherId],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/vouchers/${voucherId}`);
+      if (!res.ok) {
+        if (res.status === 401) {
+          window.location.href = `/${locale}/admin/login`;
+          throw new Error("Unauthorized");
+        }
+        throw new Error("Failed to fetch voucher");
+      }
+      return res.json();
+    },
+  });
+
+  const { data: productsData } = useQuery<{ products: ProductItem[] }>({
+    queryKey: ["admin-products-list"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/products/list");
+      if (!res.ok) throw new Error("Failed to fetch products");
+      return res.json();
+    },
+  });
+
+  useEffect(() => {
+    if (data?.voucher) {
+      const v = data.voucher;
+      setName(v.name);
+      setDescription(v.description || "");
+      setCode(v.code);
+      setStatus(v.status);
+      setStartsAt(new Date(v.startsAt).toISOString().slice(0, 16));
+      setEndsAt(new Date(v.endsAt).toISOString().slice(0, 16));
+      setMinimumCartSubtotal(v.minimumCartSubtotal ? String(v.minimumCartSubtotal) : "");
+      setTotalUsageLimit(v.totalUsageLimit ? String(v.totalUsageLimit) : "");
+      setUsagePerCustomer(v.usagePerCustomer ? String(v.usagePerCustomer) : "");
+      setSelectedProductIds(v.productIds || []);
+
+      const benefit = v.benefit;
+      setScope(benefit.scope);
+      setType(benefit.type);
+      setBenefitValue(benefit.value ? String(benefit.value) : "");
+      setMaxDiscountAmount(benefit.maxDiscountAmount ? String(benefit.maxDiscountAmount) : "");
+      setCanCombine(benefit.canCombine === true);
+
+      if (v.productIds && v.productIds.length > 0) {
+        setShowProductPicker(true);
+      }
+    }
+  }, [data]);
+
+  const filteredProducts = (productsData?.products || []).filter(
+    (p) =>
+      p.name.toLowerCase().includes(productSearch.toLowerCase()) &&
+      !selectedProductIds.includes(p.id)
+  );
+
+  const selectedProducts = (productsData?.products || []).filter((p) =>
+    selectedProductIds.includes(p.id)
+  );
+
+  const handleScopeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value as "cart" | "shipping";
+    setScope(val);
+    if (val === "cart") {
+      setType("fixed_amount");
+    } else {
+      setType("free_shipping");
+    }
+  };
+
+  const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setLoading(true);
+
+    if (new Date(startsAt) > new Date(endsAt)) {
+      toast.error("Start date must be before end date");
+      setLoading(false);
+      return;
+    }
+
+    const benefit: VoucherBenefit = { scope, type, canCombine };
+    if (type !== "free_shipping") {
+      const val = Number(benefitValue);
+      if (isNaN(val) || val <= 0) {
+        toast.error("Benefit value must be greater than 0");
+        setLoading(false);
+        return;
+      }
+      benefit.value = val;
+    }
+    if (scope === "cart" && type === "percentage" && maxDiscountAmount) {
+      benefit.maxDiscountAmount = Number(maxDiscountAmount);
+    }
+
+    const payload = {
+      name,
+      description: description || null,
+      code,
+      status,
+      startsAt: new Date(startsAt).toISOString(),
+      endsAt: new Date(endsAt).toISOString(),
+      minimumCartSubtotal: minimumCartSubtotal ? Number(minimumCartSubtotal) : null,
+      benefit,
+      productIds: selectedProductIds,
+      totalUsageLimit: totalUsageLimit ? Number(totalUsageLimit) : null,
+      usagePerCustomer: usagePerCustomer ? Number(usagePerCustomer) : null,
+    };
+
+    try {
+      const res = await fetch(`/api/admin/vouchers/${voucherId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const resData = await res.json();
+      if (res.ok) {
+        toast.success("Voucher updated successfully");
+        router.push(`/${locale}/admin/discounts`);
+        router.refresh();
+      } else {
+        toast.error(resData.error || "Failed to update voucher");
+      }
+    } catch (error) {
+      console.error("Error updating voucher:", error);
+      toast.error("Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center py-16">
+        <Loader2 className="w-8 h-8 animate-spin text-primary/70" />
+      </div>
+    );
+  }
+
+  if (isError || !data?.voucher) {
+    return (
+      <div className="py-8 text-center text-xs text-destructive">
+        Failed to load voucher details. Please go back and try again.
+      </div>
+    );
+  }
+
+  const voucher = data.voucher;
+  const usagePercent = voucher.totalUsageLimit
+    ? Math.round((voucher.consumedQuantity / voucher.totalUsageLimit) * 100)
+    : null;
+  const isExpired = new Date(voucher.endsAt) < new Date();
+
+  return (
+    <div className="flex flex-col gap-4 max-w-[800px] mx-auto">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Edit Voucher</h1>
+        <p className="text-muted-foreground text-xs">Update your voucher campaign parameters, status, and validation rules.</p>
+      </div>
+
+      {/* Usage Analytics Card */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="p-3 border border-border bg-card">
+          <div className="flex items-center gap-1.5 mb-1">
+            <BarChart3 className="w-3 h-3 text-muted-foreground" />
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Total Used</span>
+          </div>
+          <span className="text-lg font-bold tabular-nums">{voucher.consumedQuantity}</span>
+        </div>
+        <div className="p-3 border border-border bg-card">
+          <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Limit</div>
+          <span className="text-lg font-bold tabular-nums">{voucher.totalUsageLimit ?? "∞"}</span>
+        </div>
+        <div className="p-3 border border-border bg-card">
+          <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">% Used</div>
+          <div className="flex items-center gap-2">
+            <span className="text-lg font-bold tabular-nums">
+              {usagePercent !== null ? `${usagePercent}%` : "—"}
+            </span>
+            {usagePercent !== null && (
+              <div className="flex-1 h-1.5 bg-muted rounded-none overflow-hidden">
+                <div
+                  className={`h-full ${
+                    usagePercent >= 90 ? "bg-red-500" : usagePercent >= 60 ? "bg-amber-500" : "bg-emerald-500"
+                  }`}
+                  style={{ width: `${Math.min(usagePercent, 100)}%` }}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="p-3 border border-border bg-card">
+          <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Status</div>
+          <span className={`text-xs font-bold uppercase ${isExpired ? "text-red-500" : voucher.status === "active" ? "text-emerald-600" : "text-amber-600"}`}>
+            {isExpired ? "Expired" : voucher.status}
+          </span>
+        </div>
+      </div>
+
+      <form onSubmit={onSubmit} className="space-y-4 bg-card p-4 border border-border rounded-none shadow-none">
+        {/* Core Voucher Fields */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid gap-1.5">
+            <Label htmlFor="name" className="text-xs uppercase tracking-wider font-bold">Voucher Name</Label>
+            <Input
+              id="name"
+              required
+              placeholder="e.g. Summer Flash Discount"
+              className="h-9 rounded-none border-border"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+
+          <div className="grid gap-1.5">
+            <Label htmlFor="code" className="text-xs uppercase tracking-wider font-bold">Voucher Code</Label>
+            <div className="flex gap-1.5">
+              <Input
+                id="code"
+                required
+                placeholder="e.g. SUMMER50"
+                className="h-9 rounded-none border-border font-mono font-bold uppercase flex-1"
+                value={code}
+                onChange={(e) => setCode(e.target.value.trim().toUpperCase())}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                className="h-9 rounded-none px-2.5 shrink-0"
+                onClick={() => setCode(generateCode())}
+                title="Auto-generate code"
+              >
+                <Shuffle className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Description */}
+        <div className="grid gap-1.5">
+          <Label htmlFor="description" className="text-xs uppercase tracking-wider font-bold">Description (Optional)</Label>
+          <textarea
+            id="description"
+            placeholder="Internal note about this voucher campaign..."
+            className="h-16 px-3 py-2 border border-border bg-background outline-none text-sm w-full rounded-none resize-none"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
+        </div>
+
+        {/* Benefit Settings */}
+        <div className="p-3 border border-border bg-muted/10 space-y-3">
+          <h3 className="text-xs font-bold uppercase tracking-widest text-primary border-b border-border pb-1.5">Benefit Configuration</h3>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid gap-1.5">
+              <Label className="text-xs font-bold uppercase">Discount Target (Scope)</Label>
+              <select
+                className="h-9 px-3 border border-border bg-background outline-none text-sm w-full rounded-none"
+                value={scope}
+                onChange={handleScopeChange}
+              >
+                <option value="cart">Cart Subtotal</option>
+                <option value="shipping">Shipping Fee</option>
+              </select>
+            </div>
+
+            <div className="grid gap-1.5">
+              <Label className="text-xs font-bold uppercase">Benefit Type</Label>
+              <select
+                className="h-9 px-3 border border-border bg-background outline-none text-sm w-full rounded-none"
+                value={type}
+                onChange={(e) =>
+                  setType(
+                    e.target.value as "fixed_amount" | "percentage" | "free_shipping"
+                  )
+                }
+              >
+                {scope === "cart" ? (
+                  <>
+                    <option value="fixed_amount">Fixed Amount Discount</option>
+                    <option value="percentage">Percentage Discount</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="free_shipping">Free Shipping</option>
+                    <option value="fixed_amount">Fixed Shipping Discount</option>
+                  </>
+                )}
+              </select>
+            </div>
+          </div>
+
+          {type !== "free_shipping" && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid gap-1.5">
+                <Label htmlFor="benefitValue" className="text-xs font-bold uppercase">
+                  {type === "percentage" ? "Percentage Value (%)" : "Discount Value (đ)"}
+                </Label>
+                <Input
+                  id="benefitValue"
+                  type="number"
+                  required
+                  placeholder={type === "percentage" ? "15" : "50000"}
+                  className="h-9 rounded-none"
+                  value={benefitValue}
+                  onChange={(e) => setBenefitValue(e.target.value)}
+                />
+              </div>
+
+              {scope === "cart" && type === "percentage" && (
+                <div className="grid gap-1.5">
+                  <Label htmlFor="maxDiscountAmount" className="text-xs font-bold uppercase">Max Discount Cap (đ - Optional)</Label>
+                  <Input
+                    id="maxDiscountAmount"
+                    type="number"
+                    placeholder="e.g. 100000"
+                    className="h-9 rounded-none"
+                    value={maxDiscountAmount}
+                    onChange={(e) => setMaxDiscountAmount(e.target.value)}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          <label className="flex cursor-pointer items-start gap-3 border border-border bg-background p-3">
+            <input
+              type="checkbox"
+              checked={canCombine}
+              onChange={(event) => setCanCombine(event.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-primary"
+            />
+            <span>
+              <span className="block text-xs font-bold uppercase">Can use together</span>
+              <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                Allow this voucher to be combined with other vouchers that also enable this option.
+              </span>
+            </span>
+          </label>
+        </div>
+
+        {/* Product Targeting */}
+        <div className="p-3 border border-border bg-muted/10 space-y-3">
+          <h3 className="text-xs font-bold uppercase tracking-widest text-primary border-b border-border pb-1.5">Product Targeting</h3>
+
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="productScope"
+                checked={selectedProductIds.length === 0 && !showProductPicker}
+                onChange={() => {
+                  setSelectedProductIds([]);
+                  setShowProductPicker(false);
+                }}
+                className="accent-primary"
+              />
+              <span className="text-xs font-medium">All products</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="productScope"
+                checked={selectedProductIds.length > 0 || showProductPicker}
+                onChange={() => setShowProductPicker(true)}
+                className="accent-primary"
+              />
+              <span className="text-xs font-medium">Specific products</span>
+            </label>
+          </div>
+
+          {(showProductPicker || selectedProductIds.length > 0) && (
+            <div className="space-y-2">
+              {selectedProducts.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedProducts.map((p) => (
+                    <span
+                      key={p.id}
+                      className="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary text-[11px] font-medium"
+                    >
+                      {p.name}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedProductIds((prev) => prev.filter((id) => id !== p.id))}
+                        className="hover:text-destructive"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <div className="relative">
+                <div className="flex items-center border border-border bg-background">
+                  <Search className="w-3.5 h-3.5 ml-2.5 text-muted-foreground" />
+                  <input
+                    type="text"
+                    placeholder="Search products..."
+                    className="h-8 px-2 outline-none text-xs w-full bg-transparent"
+                    value={productSearch}
+                    onChange={(e) => setProductSearch(e.target.value)}
+                    onFocus={() => setShowProductPicker(true)}
+                  />
+                </div>
+                {showProductPicker && filteredProducts.length > 0 && (
+                  <div className="absolute z-10 w-full mt-0.5 border border-border bg-card shadow-md max-h-[200px] overflow-y-auto">
+                    {filteredProducts.slice(0, 20).map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        className="flex items-center gap-2 w-full px-2.5 py-1.5 text-xs hover:bg-muted/50 text-left"
+                        onClick={() => {
+                          setSelectedProductIds((prev) => [...prev, p.id]);
+                          setProductSearch("");
+                        }}
+                      >
+                        {p.images[0] && (
+                          <img src={p.images[0].url} alt={p.name} className="w-6 h-6 object-cover border border-border" />
+                        )}
+                        <span className="truncate">{p.name}</span>
+                        <span className="ml-auto text-[10px] text-muted-foreground uppercase">{p.status}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Campaign Rules & Spacing */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid gap-1.5">
+            <Label htmlFor="minimumCartSubtotal" className="text-xs font-bold uppercase">Min Order Subtotal (đ)</Label>
+            <Input
+              id="minimumCartSubtotal"
+              type="number"
+              placeholder="e.g. 150000"
+              className="h-9 rounded-none"
+              value={minimumCartSubtotal}
+              onChange={(e) => setMinimumCartSubtotal(e.target.value)}
+            />
+          </div>
+
+          <div className="grid gap-1.5">
+            <Label htmlFor="totalUsageLimit" className="text-xs font-bold uppercase">Total Usage Limit</Label>
+            <Input
+              id="totalUsageLimit"
+              type="number"
+              placeholder="e.g. 500"
+              className="h-9 rounded-none"
+              value={totalUsageLimit}
+              onChange={(e) => setTotalUsageLimit(e.target.value)}
+            />
+          </div>
+
+          <div className="grid gap-1.5">
+            <Label htmlFor="usagePerCustomer" className="text-xs font-bold uppercase">Usage Per Customer</Label>
+            <Input
+              id="usagePerCustomer"
+              type="number"
+              placeholder="e.g. 1"
+              className="h-9 rounded-none"
+              value={usagePerCustomer}
+              onChange={(e) => setUsagePerCustomer(e.target.value)}
+            />
+          </div>
+        </div>
+
+        {/* Date Ranges & Status */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid gap-1.5">
+            <Label className="text-xs font-bold uppercase">Status</Label>
+            <select
+              className="h-9 px-3 border border-border bg-background outline-none text-sm w-full rounded-none"
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+            >
+              <option value="active">Active</option>
+              <option value="draft">Draft (Inactive)</option>
+              <option value="paused">Paused (Inactive)</option>
+            </select>
+          </div>
+
+          <div className="grid gap-1.5">
+            <Label htmlFor="startsAt" className="text-xs font-bold uppercase">Starts At</Label>
+            <Input
+              id="startsAt"
+              type="datetime-local"
+              required
+              className="h-9 rounded-none text-xs"
+              value={startsAt}
+              onChange={(e) => setStartsAt(e.target.value)}
+            />
+          </div>
+
+          <div className="grid gap-1.5">
+            <Label htmlFor="endsAt" className="text-xs font-bold uppercase">Ends At</Label>
+            <Input
+              id="endsAt"
+              type="datetime-local"
+              required
+              className="h-9 rounded-none text-xs"
+              value={endsAt}
+              onChange={(e) => setEndsAt(e.target.value)}
+            />
+          </div>
+        </div>
+
+        {/* Form Actions */}
+        <div className="flex justify-end gap-3 pt-4 border-t border-border">
+          <Button
+            type="button"
+            variant="outline"
+            className="h-9 rounded-none px-6 text-xs uppercase font-bold tracking-wider"
+            onClick={() => router.push(`/${locale}/admin/discounts`)}
+            disabled={loading}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            className="h-9 rounded-none px-8 text-xs uppercase font-bold tracking-wider"
+            disabled={loading}
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
+                Saving...
+              </>
+            ) : (
+              "Save Voucher"
+            )}
+          </Button>
+        </div>
+      </form>
+    </div>
+  );
+}

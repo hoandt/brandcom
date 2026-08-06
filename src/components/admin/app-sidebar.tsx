@@ -1,3 +1,5 @@
+"use client"
+
 import {
   Sidebar,
   SidebarContent,
@@ -7,8 +9,19 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarFooter,
 } from "@/components/ui/sidebar"
-import { Package, LayoutDashboard, ShoppingCart, Users, Tag, Settings } from "lucide-react"
+import { Package, LayoutDashboard, ShoppingCart, Users, Tag, Settings, FileText, LogOut, ChevronUp, Warehouse } from "lucide-react"
+import { signOut } from "next-auth/react"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import Link from "next/link"
+import { useQuery } from "@tanstack/react-query"
 
 const items = [
   {
@@ -27,6 +40,11 @@ const items = [
     icon: ShoppingCart,
   },
   {
+    title: "Pages",
+    url: "/admin/pages",
+    icon: FileText,
+  },
+  {
     title: "Customers",
     url: "/admin/customers",
     icon: Users,
@@ -37,25 +55,42 @@ const items = [
     icon: Tag,
   },
   {
+    title: "Warehouses",
+    url: "/admin/warehouses",
+    icon: Warehouse,
+  },
+  {
     title: "Settings",
     url: "/admin/settings",
     icon: Settings,
   },
 ]
 
-export function AppSidebar() {
+export function AppSidebar({ user }: { user?: { name?: string | null; email?: string | null; image?: string | null } }) {
+  const { data } = useQuery<{ settings: { storeName: string } }>({
+    queryKey: ["store-settings"],
+    queryFn: async () => {
+      const response = await fetch("/api/settings");
+      if (!response.ok) throw new Error("Failed to load store settings");
+      return response.json();
+    },
+    staleTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+  });
+  const storeName = data?.settings.storeName || "Store";
+
   return (
-    <Sidebar>
+    <Sidebar className="border-r border-border rounded-none">
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Store Admin</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">{storeName} Admin</SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="gap-0.5">
               {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton render={<a href={item.url} />}>
-                    <item.icon />
-                    <span>{item.title}</span>
+                  <SidebarMenuButton render={<Link href={item.url} />} className="rounded-none h-8 text-xs hover:bg-muted/50 transition-colors">
+                    <item.icon className="w-3.5 h-3.5 mr-2" />
+                    <span className="font-medium">{item.title}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
@@ -63,6 +98,43 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+      <SidebarFooter className="p-2 border-t border-border bg-muted/20">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <DropdownMenu>
+              <SidebarMenuButton render={<DropdownMenuTrigger />} className="h-12 w-full justify-start gap-2 rounded-none px-2 hover:bg-muted/50 transition-colors cursor-pointer">
+                  <Avatar className="h-7 w-7 rounded-none border border-border">
+                    <AvatarImage src={user?.image || ""} alt={user?.name || "Admin"} />
+                    <AvatarFallback className="rounded-none bg-primary text-primary-foreground text-[10px] font-bold uppercase">
+                      {user?.name?.[0] || user?.email?.[0] || "A"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex flex-col items-start text-left flex-1 overflow-hidden">
+                    <span className="text-[11px] font-bold leading-none truncate w-full">
+                      {user?.name || `${storeName} Admin`}
+                    </span>
+                    <span className="text-[9px] text-muted-foreground truncate w-full mt-0.5 uppercase tracking-wide">
+                      {user?.email || "admin@store.com"}
+                    </span>
+                  </div>
+                  <ChevronUp className="h-3 w-3 text-muted-foreground ml-auto" />
+                </SidebarMenuButton>
+              <DropdownMenuContent
+                side="top"
+                className="w-[--radix-dropdown-menu-trigger-width] rounded-none border-border shadow-none"
+              >
+                <DropdownMenuItem
+                  onClick={() => signOut({ callbackUrl: "/" })}
+                  className="text-destructive focus:bg-destructive/10 focus:text-destructive rounded-none text-xs font-bold uppercase tracking-wider cursor-pointer"
+                >
+                  <LogOut className="mr-2 h-3.5 w-3.5" />
+                  <span>Log Out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
     </Sidebar>
   )
 }

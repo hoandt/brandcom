@@ -151,7 +151,7 @@ async function main() {
   const intimatesCategory = await prisma.category.create({
     data: { name: "Intimates", slug: "intimates", description: "Seamless and comfortable." },
   });
-  
+
   for (const tkProduct of tiktokMockData) {
     // We map the TikTok 'title' to Prisma 'name' and create a slug from it
     const slug = tkProduct.title.toLowerCase().replace(/[^a-z0-9]+/g, "-");
@@ -219,6 +219,60 @@ async function main() {
   });
 
   console.log("Coupons seeded successfully.");
+
+  // Seed sample about page
+  await prisma.page.deleteMany({ where: { slug: "about" } });
+  await prisma.page.create({
+    data: {
+      slug: "about",
+      title: {
+        en: "About Auria",
+        vi: "Về Auria",
+        th: "เกี่ยวกับ Auria",
+      },
+      content: [
+        {
+          id: "sec-1",
+          layout: "1-col",
+          columns: [
+            {
+              span: 12,
+              content: {
+                en: "At **AURIA**, we empower confidence and comfort with innovative, high-quality solutions. Founded to address gaps in the fashion and undergarment industry, our mission is to become the world's leading provider of premium nipple covers and undergarments.",
+                vi: "Tại **AURIA**, chúng tôi tôn vinh sự tự tin và thoải mái bằng các giải pháp sáng tạo, chất lượng cao. Được thành lập nhằm giải quyết các khoảng trống trong ngành thời trang và nội y, sứ mệnh của chúng tôi là trở thành nhà cung cấp miếng dán ngực và nội y cao cấp hàng đầu thế giới.",
+                th: "ที่ **AURIA** เราส่งเสริมความมั่นใจและความสะดวกสบายด้วยโซลูชั่นที่สร้างสรรค์และมีคุณภาพสูง ก่อตั้งขึ้นเพื่อแก้ปัญหากลุ่มสินค้าแฟชั่นและชุดชั้นใน ภารกิจของเราคือการเป็นผู้ให้บริการแผ่นแปะหน้าอกและชุดชั้นในระดับพรีเมียมชั้นนำของโลก",
+              }
+            }
+          ]
+        },
+        {
+          id: "sec-2",
+          layout: "2-col-equal",
+          columns: [
+            {
+              span: 6,
+              content: {
+                en: "![Auria Brand Philosophy](https://placehold.co/800x600/e3c8c8/701a23?text=AURIA+Philosophy)",
+                vi: "![Triết lý thương hiệu Auria](https://placehold.co/800x600/e3c8c8/701a23?text=AURIA+Philosophy)",
+                th: "![ปรัชญาแบรนด์ Auria](https://placehold.co/800x600/e3c8c8/701a23?text=AURIA+Philosophy)",
+              }
+            },
+            {
+              span: 6,
+              content: {
+                en: "Our mission is simple: to redefine essentials with products that make you feel secure, confident, and comfortable. By combining innovative materials with thoughtful design, we create solutions that seamlessly integrate into your wardrobe.\n\nEvery product is crafted using dermatologist-tested, medical-grade materials, ensuring a gentle touch on your skin and ultimate durability.",
+                vi: "Sứ mệnh của chúng tôi rất đơn giản: định nghĩa lại các sản phẩm thiết yếu giúp bạn cảm thấy an toàn, tự tin và thoải mái. Bằng cách kết hợp các vật liệu sáng tạo với thiết kế chu đáo, chúng tôi tạo ra các giải pháp tích hợp liền mạch vào tủ quần áo của bạn.\n\nMỗi sản phẩm đều được chế tác bằng các vật liệu y tế đã qua kiểm nghiệm da liễu, đảm bảo độ dịu nhẹ cho da và độ bền tối đa.",
+                th: "ภารกิจของเรานั้นง่ายมาก: เพื่อกำหนดนิยามใหม่ของสิ่งจำเป็นด้วยผลิตภัณฑ์ที่ทำให้คุณรู้สึกปลอดภัย มั่นใจ และสะดวกสบาย ด้วยการผสมผสานวัสดุที่เป็นนวัตกรรมเข้ากับการออกแบบที่คิดมาอย่างดี เราจึงสร้างโซลูชันที่ผสานเข้ากับตู้เสื้อผ้าของคุณได้อย่างราบรื่น\n\nทุกผลิตภัณฑ์สร้างสรรค์ขึ้นโดยใช้วัสดุเกรดทางการแพทย์ที่ผ่านการทดสอบโดยแพทย์ผิวหนัง เพื่อให้มั่นใจว่าสัมผัสที่อ่อนโยนต่อผิวของคุณและมีความทนทานสูงสุด",
+              }
+            }
+          ]
+        }
+      ] as any,
+      isActive: true,
+    },
+  });
+
+  console.log("Pages seeded successfully.");
 }
 main()
   .catch((e) => {

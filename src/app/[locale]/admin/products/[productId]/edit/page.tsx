@@ -15,7 +15,8 @@ export default async function EditProductPage(
         orderBy: { position: "asc" },
       },
       variants: {
-        orderBy: { id: "asc" }
+        orderBy: { id: "asc" },
+        include: { inventories: true },
       },
     },
   });
@@ -23,6 +24,12 @@ export default async function EditProductPage(
   if (!product) {
     notFound();
   }
+
+  const warehouses = await prisma.warehouse.findMany({
+    where: { isActive: true },
+    orderBy: [{ isDefault: "desc" }, { name: "asc" }],
+    select: { id: true, name: true, code: true, isDefault: true, isPickup: true },
+  });
 
   // Map product database structure including all variants and new SEO fields to form props
   const initialData = {
@@ -40,15 +47,19 @@ export default async function EditProductPage(
       sku: v.sku,
       price: parseFloat(v.price.toString()),
       stock: v.stock,
+      inventories: v.inventories.map((inventory) => ({
+        warehouseId: inventory.warehouseId,
+        quantity: inventory.quantity,
+      })),
       imageUrl: v.imageUrl || "",
     })),
+    warehouses,
   };
-
   return (
-    <div className="flex flex-col gap-6 max-w-3xl px-4 py-8">
+    <div className="flex flex-col gap-4 w-full max-w-[1400px] mx-auto">
       <div>
-        <h1 className="text-3xl font-heading uppercase tracking-widest mb-2">Edit Product</h1>
-        <p className="text-muted-foreground font-light text-sm">Update product details, variants, custom SKUs and SEO details</p>
+        <h1 className="text-2xl font-bold tracking-tight">Edit Product</h1>
+        <p className="text-muted-foreground text-xs">Update product details, variants, custom SKUs and SEO details</p>
       </div>
       <EditProductForm initialData={initialData} />
     </div>

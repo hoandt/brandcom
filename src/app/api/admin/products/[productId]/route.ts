@@ -139,6 +139,16 @@ export async function PUT(
 
       // 4. Update existing variants & Create new variants
       for (const v of variants) {
+        const inventories = Array.isArray(v.inventories)
+          ? v.inventories
+              .map((inventory: { warehouseId?: string; quantity?: number }) => ({
+                warehouseId: inventory.warehouseId || "",
+                quantity: Math.max(0, Math.floor(Number(inventory.quantity) || 0)),
+              }))
+              .filter((inventory: { warehouseId: string; quantity: number }) => inventory.warehouseId && inventory.quantity > 0)
+          : [];
+        const totalStock = inventories.reduce((sum: number, inventory: { quantity: number }) => sum + inventory.quantity, 0);
+
         if (v.id) {
           // Update existing variant
           await tx.productVariant.update({
@@ -147,23 +157,42 @@ export async function PUT(
               name: v.name,
               sku: v.sku,
               price: v.price,
-              stock: v.stock,
+              stock: totalStock,
               imageUrl: v.imageUrl || null,
             },
           });
+          await tx.warehouseInventory.deleteMany({ where: { variantId: v.id } });
+          if (inventories.length > 0) {
+            await tx.warehouseInventory.createMany({
+              data: inventories.map((inventory: { warehouseId: string; quantity: number }) => ({
+                variantId: v.id,
+                warehouseId: inventory.warehouseId,
+                quantity: inventory.quantity,
+              })),
+            });
+          }
         } else {
           // Create new variant
-          await tx.productVariant.create({
+          const createdVariant = await tx.productVariant.create({
             data: {
               productId,
               name: v.name,
               sku: v.sku,
               price: v.price,
-              stock: v.stock,
+              stock: totalStock,
               imageUrl: v.imageUrl || null,
               isActive: true,
             },
           });
+          if (inventories.length > 0) {
+            await tx.warehouseInventory.createMany({
+              data: inventories.map((inventory: { warehouseId: string; quantity: number }) => ({
+                variantId: createdVariant.id,
+                warehouseId: inventory.warehouseId,
+                quantity: inventory.quantity,
+              })),
+            });
+          }
         }
       }
 

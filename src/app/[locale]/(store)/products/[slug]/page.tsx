@@ -5,6 +5,7 @@ import { ProductClient } from "./product-client";
 import { unstable_cache } from "next/cache";
 import type { Metadata } from "next";
 import { marked } from "marked";
+import { formatPrice } from "@/lib/utils";
 
 type Props = {
   params: Promise<{ locale: string; slug: string }>;
@@ -96,164 +97,39 @@ export default async function ProductPage({ params }: Props) {
   };
 
   return (
-    <div className="container mx-auto px-0 md:px-4 pt-0 md:pt-12 pb-40 max-w-7xl">
+    <div className="min-h-screen selection:bg-primary/20 bg-[#faf9f7] dark:bg-neutral-950">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-10 pt-8 lg:pt-16 max-w-7xl">
       {/* Schema.org / JSON-LD for Search Engines & AI Bots */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
-        {/* Left Column: Image Gallery + Product Details */}
-        <div className="lg:col-span-7 flex flex-col space-y-8">
-          {/* Images (Edge-to-Edge on Mobile) */}
-          <div className="flex flex-col space-y-4">
-            {product.images.map((img, idx) => (
-              <div key={img.id} className="relative aspect-[3/4] w-full bg-secondary overflow-hidden">
-                <Image
-                  src={img.url}
-                  alt={img.alt || `${product.name} - Image ${idx + 1}`}
-                  fill
-                  className="object-cover"
-                  sizes="(max-width: 1024px) 100vw, 60vw"
-                  priority={idx === 0}
-                />
-                {idx === 0 && (
-                  <div className="absolute bottom-4 left-4 bg-black/75 text-white text-[10px] tracking-wider px-3 py-1.5 font-light">
-                    Model is 170 cm / Wearing size: M
-                  </div>
-                )}
-              </div>
-            ))}
-            {product.images.length === 0 && (
-              <div className="relative aspect-[3/4] w-full bg-secondary overflow-hidden flex items-center justify-center">
-                <span className="text-muted-foreground font-heading uppercase tracking-widest text-xs">No Image Available</span>
-              </div>
-            )}
-          </div>
-
-          {/* Mobile-Only Title & Price Header (With Padding) */}
-          <div className="lg:hidden px-4 border-b border-border pb-6">
-            <div className="flex items-center gap-1 mb-2">
-              <div className="flex text-amber-500">
-                {"★★★★★".split("").map((star, i) => (
-                  <span key={i} className="text-sm">★</span>
-                ))}
-              </div>
-              <span className="text-xs text-muted-foreground font-light hover:underline cursor-pointer">(3 reviews)</span>
-            </div>
-            <h1 className="text-2xl font-heading uppercase tracking-widest mb-2">
-              {product.name}
-            </h1>
-            <div className="text-2xl font-bold tracking-wide text-primary">
-              ${product.variants[0]?.price.toString() || "0.00"}
-            </div>
-          </div>
-
-          {/* Product Details: Stacked below images inside left column (With Padding) */}
-          <div className="border-t lg:border-t-0 border-border pt-12 lg:pt-0 px-4 lg:px-0">
-            <h2 className="text-lg uppercase tracking-widest font-heading mb-8 pb-2 border-b border-border w-fit">
-              Product Details
-            </h2>
-            
-            <div className="flex flex-col space-y-10 font-light text-sm text-foreground/90">
-              {/* Overview */}
-              {compiledOverview && (
-                <div>
-                  <h3 className="text-xs uppercase tracking-widest font-semibold mb-3 text-foreground">Overview</h3>
-                  <div 
-                    className="prose prose-sm max-w-none text-muted-foreground font-light leading-relaxed" 
-                    dangerouslySetInnerHTML={{ __html: compiledOverview }} 
-                  />
-                </div>
-              )}
-
-              {/* Description */}
-              {compiledDescription && (
-                <div>
-                  <h3 className="text-xs uppercase tracking-widest font-semibold mb-3 text-foreground">Description</h3>
-                  <div 
-                    className="prose prose-sm max-w-none text-muted-foreground font-light leading-relaxed" 
-                    dangerouslySetInnerHTML={{ __html: compiledDescription }} 
-                  />
-                </div>
-              )}
-
-              {/* Materials */}
-              {compiledMaterials && (
-                <div>
-                  <h3 className="text-xs uppercase tracking-widest font-semibold mb-3 text-foreground">Materials</h3>
-                  <div 
-                    className="prose prose-sm max-w-none text-muted-foreground font-light leading-relaxed" 
-                    dangerouslySetInnerHTML={{ __html: compiledMaterials }} 
-                  />
-                </div>
-              )}
-
-              {/* Care Instructions */}
-              {compiledCare && (
-                <div>
-                  <h3 className="text-xs uppercase tracking-widest font-semibold mb-3 text-foreground">Care Instructions</h3>
-                  <div 
-                    className="prose prose-sm max-w-none text-muted-foreground font-light leading-relaxed" 
-                    dangerouslySetInnerHTML={{ __html: compiledCare }} 
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Right Column: Sticky Side Panel (With Padding on Mobile) */}
-        <div className="lg:col-span-5 lg:sticky lg:top-28 h-fit flex flex-col space-y-6 px-4 lg:px-0">
-          {/* Desktop-Only Title & Price Header */}
-          <div className="hidden lg:block">
-            <div className="flex items-center gap-1 mb-2">
-              <div className="flex text-amber-500">
-                {"★★★★★".split("").map((star, i) => (
-                  <span key={i} className="text-sm">★</span>
-                ))}
-              </div>
-              <span className="text-xs text-muted-foreground font-light hover:underline cursor-pointer">(3 reviews)</span>
-            </div>
-            <h1 className="text-2xl lg:text-3xl font-heading uppercase tracking-widest mb-3">
-              {product.name}
-            </h1>
-            <div className="text-2xl font-bold tracking-wide text-primary">
-              ${product.variants[0]?.price.toString() || "0.00"}
-            </div>
-          </div>
-
-          {/* Client component for interactive variant selection and add to cart */}
-          <ProductClient
-            product={{
-              id: product.id,
-              name: product.name,
-              images: product.images,
-              variants: product.variants.map((v) => ({
-                id: v.id,
-                sku: v.sku,
-                name: v.name,
-                stock: v.stock,
-                isActive: v.isActive,
-                price: Number(v.price),
-                comparePrice: v.comparePrice ? Number(v.comparePrice) : null,
-              })),
-            }}
-          />
-
-          <div className="border-t border-border pt-8 space-y-4 font-light text-sm">
-            <div className="flex justify-between">
-              <span className="uppercase tracking-widest font-heading text-xs">Shipping</span>
-              <span>Free standard shipping on orders over $100</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="uppercase tracking-widest font-heading text-xs">Returns</span>
-              <span>30-day return policy</span>
-            </div>
-          </div>
-        </div>
-      </div>
+      <ProductClient
+        product={{
+          id: product.id,
+          name: product.name,
+          slug: product.slug,
+          images: product.images,
+          variants: product.variants.map((v) => ({
+            id: v.id,
+            sku: v.sku,
+            name: v.name,
+            stock: v.stock,
+            isActive: v.isActive,
+            price: Number(v.price),
+            comparePrice: v.comparePrice ? Number(v.comparePrice) : null,
+            imageUrl: v.imageUrl,
+          })),
+        }}
+        details={{
+          description: compiledDescription,
+          overview: compiledOverview,
+          materials: compiledMaterials,
+          care: compiledCare,
+        }}
+      />
+    </div>
     </div>
   );
 }
