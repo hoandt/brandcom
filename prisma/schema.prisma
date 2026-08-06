@@ -174,7 +174,7 @@ model User {
   name          String?
   email         String?   @unique
   emailVerified DateTime?
-  phone         String?
+  phone         String?   @unique
   image         String?
   password      String?
   accounts      Account[]
@@ -183,6 +183,41 @@ model User {
   orders        Order[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+}
+
+model PhoneOtpChallenge {
+  id                String   @id @default(cuid())
+  phone             String   @unique
+  codeHash          String
+  expiresAt         DateTime
+  attempts          Int      @default(0)
+  resendAvailableAt DateTime
+  sendCount         Int      @default(1)
+  windowStartedAt   DateTime @default(now())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([expiresAt])
+}
+
+model AuthRateLimit {
+  key             String   @id
+  attempts        Int      @default(1)
+  windowStartedAt DateTime @default(now())
+  expiresAt       DateTime
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([expiresAt])
+}
+
+model IntegrationToken {
+  provider     String    @id
+  accessToken  String    @db.Text
+  refreshToken String    @db.Text
+  expiresAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 }
 
 model Account {

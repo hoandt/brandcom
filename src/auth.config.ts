@@ -64,6 +64,11 @@ export const authConfig = {
   },
   providers: [], // Add providers in auth.ts as they are not edge-compatible
   session: {
-    strategy: "jwt"
+    strategy: "jwt",
+    maxAge: 60 * 60 * 24 * 365,
+    updateAge: 60 * 60 * 24,
+  },
+  jwt: {
+    maxAge: 60 * 60 * 24 * 365,
   },
 } satisfies NextAuthConfig;

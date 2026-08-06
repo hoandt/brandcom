@@ -3,7 +3,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect, useCallback } from "react";
 import { useLocale, useTranslations } from "next-intl";
@@ -32,6 +32,7 @@ import {
 import { formatPrice, cn } from "@/lib/utils";
 import { AddressBook } from "@/components/checkout/address-book";
 import { VoucherPickerDialog } from "@/components/checkout/voucher-picker-dialog";
+import { ZaloLoginDialog } from "@/components/auth/zalo-login-dialog";
 
 const checkoutSchema = z.object({
   customerName: z.string().min(1, "Name is required"),
@@ -75,8 +76,10 @@ function SectionHeader({ icon: Icon, label, action }: { icon: React.ElementType;
 
 export default function CheckoutPage() {
   const t = useTranslations("Checkout");
+  const zaloT = useTranslations("ZaloLogin");
   const locale = useLocale();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [isMounted, setIsMounted] = useState(false);
   const [appliedCoupons, setAppliedCoupons] = useState<
     {
@@ -90,8 +93,16 @@ export default function CheckoutPage() {
   >([]);
   const [isVoucherDialogOpen, setIsVoucherDialogOpen] = useState(false);
   const [isAddressBookOpen, setIsAddressBookOpen] = useState(false);
+  const [isZaloLoginOpen, setIsZaloLoginOpen] = useState(false);
+  const [hasPromptedZaloLogin, setHasPromptedZaloLogin] = useState(false);
 
-  const { data: savedAddresses = [], isLoading: isLoadingAddresses } = useQuery<unknown[]>({
+  const {
+    data: savedAddresses = [],
+    isLoading: isLoadingAddresses,
+    isError: isAddressQueryError,
+    error: addressQueryError,
+    refetch: refetchAddresses,
+  } = useQuery<unknown[]>({
     queryKey: ["user-addresses"],
     queryFn: async () => {
       const res = await fetch("/api/user/addresses");
@@ -100,7 +111,13 @@ export default function CheckoutPage() {
       return json.data;
     },
     retry: false,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
+  const isAddressUnauthorized =
+    isAddressQueryError &&
+    addressQueryError instanceof Error &&
+    addressQueryError.message === "Unauthorized";
   const { data: storeSettingsData } = useQuery<{ settings: { storeName: string; currency: string; fallbackShippingFee: number } }>({
     queryKey: ["store-settings"],
     queryFn: async () => {
@@ -121,6 +138,17 @@ export default function CheckoutPage() {
   const removeItem = useCartStore((s) => s.removeItem);
 
   useEffect(() => { setIsMounted(true); }, []);
+
+  useEffect(() => {
+    if (
+      locale === "vi" &&
+      isAddressUnauthorized &&
+      !hasPromptedZaloLogin
+    ) {
+      setIsZaloLoginOpen(true);
+      setHasPromptedZaloLogin(true);
+    }
+  }, [hasPromptedZaloLogin, isAddressUnauthorized, locale]);
 
   const handleIncrement = (id: string, qty: number) => updateQuantity(id, qty + 1);
   const handleDecrement = (id: string, qty: number) => {
@@ -340,9 +368,35 @@ export default function CheckoutPage() {
 
   const hasAddress = Boolean(watch("customerName") && watch("customerPhone") && watch("address"));
   const addressError = errors.customerName || errors.customerPhone || errors.address || errors.location;
-  const needsDeliveryAddress = !isLoadingAddresses && savedAddresses.length === 0;
+  const needsDeliveryAddress =
+    !isLoadingAddresses &&
+    !isAddressUnauthorized &&
+    savedAddresses.length === 0;
+
+  const handleAuthenticationRequired = () => {
+    if (locale === "vi") {
+      setIsZaloLoginOpen(true);
+      return;
+    }
+
+    router.push(`/${locale}/login?redirectTo=/${locale}/checkout`);
+  };
+
+  const handleAddressAction = () => {
+    if (isAddressUnauthorized) {
+      handleAuthenticationRequired();
+      return;
+    }
+
+    setIsAddressBookOpen(true);
+  };
 
   const handleCheckoutAction = () => {
+    if (isAddressUnauthorized) {
+      handleAuthenticationRequired();
+      return;
+    }
+
     if (needsDeliveryAddress) {
       setIsAddressBookOpen(true);
       return;
@@ -355,7 +409,11 @@ export default function CheckoutPage() {
     ? locale === "vi"
       ? "Đang tải địa chỉ…"
       : "Loading addresses…"
-    : needsDeliveryAddress
+    : isAddressUnauthorized
+      ? locale === "vi"
+        ? zaloT("checkoutAction")
+        : zaloT("emailLogin")
+      : needsDeliveryAddress
       ? locale === "vi"
         ? "Chọn địa chỉ giao hàng"
         : "Choose delivery address"
@@ -366,7 +424,7 @@ export default function CheckoutPage() {
   const isCheckoutActionDisabled =
     mutation.isPending ||
     isLoadingAddresses ||
-    (!needsDeliveryAddress && !isValid);
+    (!isAddressUnauthorized && !needsDeliveryAddress && !isValid);
 
   // ── Trust badges data ─────────────────────────────────────────
   const trustBadges = [
@@ -417,13 +475,15 @@ export default function CheckoutPage() {
         <input type="hidden" {...register("address")} />
 
         {/* Address book (headless) */}
-        <AddressBook
-          onSelectAddress={handleSelectAddress}
-          open={isAddressBookOpen}
-          onOpenChange={setIsAddressBookOpen}
-          hasSelection={hasAddress}
-          hideTrigger={true}
-        />
+        {!isAddressUnauthorized && (
+          <AddressBook
+            onSelectAddress={handleSelectAddress}
+            open={isAddressBookOpen}
+            onOpenChange={setIsAddressBookOpen}
+            hasSelection={hasAddress}
+            hideTrigger={true}
+          />
+        )}
 
         {/* ── Two-column grid (desktop) / single col (mobile) ── */}
         <div className="container max-w-5xl mx-auto px-3 pt-5 pb-5">
@@ -443,7 +503,7 @@ export default function CheckoutPage() {
               ) : (
                 <button
                   type="button"
-                  onClick={() => setIsAddressBookOpen(true)}
+                  onClick={handleAddressAction}
                   className={cn(
                     "w-full bg-white dark:bg-neutral-900 rounded-2xl shadow-[0_2px_16px_rgba(0,0,0,0.06)] p-4 flex items-start gap-3 text-left transition-all hover:shadow-[0_4px_24px_rgba(0,0,0,0.1)] active:scale-[0.99]",
                     addressError && !hasAddress && "ring-2 ring-destructive/40"
@@ -470,6 +530,10 @@ export default function CheckoutPage() {
                           {watch("location")?.province?.name}
                         </p>
                       </>
+                    ) : isAddressUnauthorized ? (
+                      <p className="text-sm font-semibold text-primary">
+                        {zaloT("addressPrompt")}
+                      </p>
                     ) : (
                       <p className={cn("text-sm font-semibold", addressError ? "text-destructive" : "text-muted-foreground")}>
                         {locale === "vi" ? "Thêm địa chỉ giao hàng" : "Add an address"}
@@ -847,6 +911,22 @@ export default function CheckoutPage() {
         }
         onRemove={removeCoupon}
       />
+
+      {locale === "vi" && (
+        <ZaloLoginDialog
+          open={isZaloLoginOpen}
+          onOpenChange={setIsZaloLoginOpen}
+          showPasswordLogin
+          onSuccess={async () => {
+            await queryClient.invalidateQueries({
+              queryKey: ["user-addresses"],
+            });
+            await refetchAddresses();
+            router.refresh();
+            setIsAddressBookOpen(true);
+          }}
+        />
+      )}
     </div>
   );
 }

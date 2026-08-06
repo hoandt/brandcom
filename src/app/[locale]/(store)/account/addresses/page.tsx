@@ -9,14 +9,14 @@ export default async function AddressesPage() {
   const session = await auth()
   const locale = await getLocale()
 
-  if (!session?.user?.email) {
+  if (!session?.user?.id) {
     redirect(`/${locale}/login`)
   }
 
   const t = await getTranslations("Account")
 
   const user = await prisma.user.findUnique({
-    where: { email: session.user.email },
+    where: { id: session.user.id },
     include: { addresses: true }
   })
 
@@ -37,7 +37,7 @@ export default async function AddressesPage() {
           </div>
         ) : (
           <div className="grid gap-6 md:grid-cols-2">
-            {user?.addresses.map((address: any) => (
+            {user?.addresses.map((address) => (
               <div key={address.id} className="border border-border rounded-lg p-5 flex flex-col relative bg-card shadow-sm">
                 {address.isDefault && (
                   <span className="absolute top-5 right-5 text-[10px] font-bold uppercase tracking-widest text-primary bg-primary/10 px-2 py-1 rounded">

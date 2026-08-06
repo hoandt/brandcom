@@ -1,12 +1,13 @@
 "use client"
 
-import { useActionState, useState, useEffect } from "react"
+import { useActionState, useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { updateAccount } from "./actions"
 import { useTranslations } from "next-intl"
 import { Eye, EyeOff } from "lucide-react"
 import { toast } from "sonner"
+import { formatVietnamesePhone } from "@/lib/auth/phone-otp"
 
 interface AccountFormProps {
   user: {
@@ -19,23 +20,25 @@ interface AccountFormProps {
   locale: string
 }
 
-function PasswordInput({ name, label, placeholder }: { name: string, label: string, placeholder?: string }) {
+function PasswordInput({ name, label }: { name: string, label: string }) {
   const [show, setShow] = useState(false)
+  const loginT = useTranslations("Login")
+
   return (
     <div className="space-y-2">
       <label className="text-xs uppercase tracking-widest text-muted-foreground font-bold">{label}</label>
-      <div className="relative">
+      <div className="relative max-w-md">
         <Input
           type={show ? "text" : "password"}
           name={name}
-          placeholder={placeholder || "••••••••"}
-          className="h-12 pr-10 max-w-md"
+          placeholder="••••••••"
+          className="h-12 rounded-none pr-12"
         />
         <button
           type="button"
-          onClick={() => setShow(!show)}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground md:right-auto md:left-[26rem]"
-          style={{ right: '12px' }}
+          onClick={() => setShow((visible) => !visible)}
+          className="absolute inset-y-0 right-0 flex w-12 items-center justify-center text-muted-foreground hover:text-foreground"
+          aria-label={show ? loginT("hidePassword") : loginT("showPassword")}
         >
           {show ? <EyeOff size={18} /> : <Eye size={18} />}
         </button>
@@ -68,7 +71,13 @@ export function AccountForm({ user, sessionName, locale }: AccountFormProps) {
 
         <div className="space-y-2">
           <label className="text-xs uppercase tracking-widest text-muted-foreground font-bold">{t("phone")}</label>
-          <Input name="phone" defaultValue={user?.phone || ""} className="h-12" />
+          <Input
+            value={user?.phone ? formatVietnamesePhone(user.phone) : ""}
+            readOnly
+            aria-readonly="true"
+            className="h-12 bg-muted/50 text-muted-foreground"
+          />
+          <p className="text-xs text-muted-foreground">{t("phoneLocked")}</p>
         </div>
 
         <div className="space-y-2 sm:col-span-2">
@@ -77,26 +86,21 @@ export function AccountForm({ user, sessionName, locale }: AccountFormProps) {
         </div>
       </div>
 
-      <div className="pt-8 border-t border-border">
-         <h3 className="text-sm font-bold uppercase tracking-wider mb-6 text-foreground">{t("changePassword")}</h3>
-
-         <div className="space-y-6">
-           {/* If user has a password, require current password to change it */}
-           {user.password && (
-             <div className="pb-6 border-b border-border/50">
-               <PasswordInput name="currentPassword" label={t("currentPassword")} />
-             </div>
-           )}
-
-           <div className="space-y-6">
-             <PasswordInput name="newPassword" label={t("newPassword")} />
-             <PasswordInput name="confirmNewPassword" label={t("confirmNewPassword")} />
-           </div>
-         </div>
+      <div className="border-t border-border pt-8">
+        <h3 className="mb-6 text-sm font-bold uppercase tracking-wider text-foreground">{t("changePassword")}</h3>
+        <div className="space-y-6">
+          {user.password && (
+            <div className="border-b border-border/50 pb-6">
+              <PasswordInput name="currentPassword" label={t("currentPassword")} />
+            </div>
+          )}
+          <PasswordInput name="newPassword" label={t("newPassword")} />
+          <PasswordInput name="confirmNewPassword" label={t("confirmNewPassword")} />
+        </div>
       </div>
 
       <div className="flex items-center gap-4 pt-6">
-        <Button type="submit" disabled={isPending} className="h-12 rounded-full uppercase tracking-widest font-bold px-8 shadow-sm">
+        <Button type="submit" disabled={isPending} className="h-12 rounded-none uppercase tracking-widest font-bold px-8 shadow-sm">
           {isPending ? "..." : t("saveChanges")}
         </Button>
       </div>

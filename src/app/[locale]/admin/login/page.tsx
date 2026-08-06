@@ -8,8 +8,10 @@ import { redirect } from "next/navigation"
 
 export default async function LoginPage(props: {
   searchParams: Promise<{ error?: string }>
+  params: Promise<{ locale: string }>
 }) {
   const searchParams = await props.searchParams;
+  const { locale } = await props.params;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
@@ -30,14 +32,14 @@ export default async function LoginPage(props: {
             action={async (formData) => {
               "use server"
               try {
-                await signIn("credentials", formData)
+                await signIn("admin-credentials", formData)
               } catch (err) {
                 if (err instanceof AuthError) {
                   switch (err.type) {
                     case "CredentialsSignin":
-                      redirect("?error=CredentialsSignin")
+                      redirect(`/${locale}/admin/login?error=CredentialsSignin`)
                     default:
-                      redirect("?error=Default")
+                      redirect(`/${locale}/admin/login?error=Default`)
                   }
                 }
                 throw err

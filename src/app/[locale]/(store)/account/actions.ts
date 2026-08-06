@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 import { revalidatePath } from "next/cache"
 import { getTranslations } from "next-intl/server"
+import type { Prisma } from "@/generated/prisma/client"
 
 export type AccountFormState = {
   success?: boolean
@@ -18,31 +19,29 @@ export async function updateAccount(
 ): Promise<AccountFormState> {
   const session = await auth()
 
-  if (!session?.user?.email) {
+  if (!session?.user?.id) {
     return { error: "Not authenticated" }
   }
 
-  const userEmail = session.user.email
+  const userId = session.user.id
   const t = await getTranslations("Account")
 
   const name = formData.get("name") as string
-  const phone = formData.get("phone") as string
   const currentPassword = formData.get("currentPassword") as string
   const newPassword = formData.get("newPassword") as string
   const confirmNewPassword = formData.get("confirmNewPassword") as string
   const locale = formData.get("locale") as string || "en"
 
   const user = await prisma.user.findUnique({
-    where: { email: userEmail }
+    where: { id: userId }
   })
 
   if (!user) {
     return { error: "User not found" }
   }
 
-  const dataToUpdate: any = {}
+  const dataToUpdate: Prisma.UserUpdateInput = {}
   if (name) dataToUpdate.name = name
-  if (phone) dataToUpdate.phone = phone
 
   if (newPassword) {
     if (newPassword !== confirmNewPassword) {
@@ -53,6 +52,7 @@ export async function updateAccount(
       if (!currentPassword) {
         return { error: t("incorrectCurrentPassword") }
       }
+
       const isMatch = await bcrypt.compare(currentPassword, user.password)
       if (!isMatch) {
         return { error: t("incorrectCurrentPassword") }
@@ -64,12 +64,11 @@ export async function updateAccount(
 
   try {
     await prisma.user.update({
-      where: { email: userEmail },
-      data: dataToUpdate
+      where: { id: userId },
+      data: dataToUpdate,
     })
 
     revalidatePath(`/${locale}/account`)
-
     if (newPassword) {
       return { success: true, message: t("passwordUpdated") }
     }
