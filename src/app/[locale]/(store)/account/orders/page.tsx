@@ -12,7 +12,7 @@ export default async function OrdersPage({
   const locale = await getLocale()
   const { status } = await searchParams
 
-  if (!session?.user?.email) {
+  if (!session?.user?.id) {
     redirect(`/${locale}/login`)
   }
 
@@ -34,6 +34,7 @@ export default async function OrdersPage({
     ordersToShip: t("ordersToShip"),
     ordersCompleted: t("ordersCompleted"),
     ordersCancelled: t("ordersCancelled"),
+    sidebarOrderStatuses: t("orderStatusTabs"),
   }
 
   return (

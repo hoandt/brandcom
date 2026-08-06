@@ -1,7 +1,7 @@
 "use client"
 
 import { useQuery } from "@tanstack/react-query"
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { PackageOpen, Store, Loader2 } from "lucide-react"
@@ -26,11 +26,44 @@ interface OrdersClientProps {
     ordersToShip: string;
     ordersCompleted: string;
     ordersCancelled: string;
+    sidebarOrderStatuses: string;
   }
+}
+
+interface OrderVariant {
+  product?: {
+    images?: Array<{ url: string }>;
+    slug?: string;
+  };
+}
+
+interface OrderItem {
+  id: string;
+  variantId: string;
+  productName: string;
+  variantName?: string | null;
+  sku: string;
+  price: number | string;
+  quantity: number;
+}
+
+interface OrderSummary {
+  id: string;
+  orderNumber?: string | null;
+  orderStatus: string;
+  totalAmount: number | string;
+  items: OrderItem[];
+}
+
+interface OrdersResponse {
+  orders: OrderSummary[];
+  variantMap: Record<string, OrderVariant>;
+  counts: Record<string, number>;
 }
 
 export function OrdersClient({ locale, initialStatus, translations }: OrdersClientProps) {
   const [currentStatus, setCurrentStatus] = useState(initialStatus)
+  const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({})
 
   const tabs = [
     { id: "all", label: translations.ordersAll },
@@ -45,7 +78,7 @@ export function OrdersClient({ locale, initialStatus, translations }: OrdersClie
     queryFn: async () => {
       const res = await fetch(`/api/user/orders?status=${currentStatus}`)
       if (!res.ok) throw new Error("Failed to fetch")
-      return res.json()
+      return (await res.json()) as OrdersResponse
     },
     refetchOnWindowFocus: false,
     staleTime: 1000 * 60 * 5, // Cache for 5 minutes
@@ -62,6 +95,33 @@ export function OrdersClient({ locale, initialStatus, translations }: OrdersClie
     window.history.pushState({}, "", url.toString())
   }
 
+  useEffect(() => {
+    tabRefs.current[currentStatus]?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "center",
+    })
+  }, [currentStatus])
+
+  useEffect(() => {
+    const handleHistoryChange = () => {
+      const status = new URL(window.location.href).searchParams.get("status")
+      const nextStatus = [
+        "all",
+        "pending",
+        "processing",
+        "completed",
+        "cancelled",
+      ].includes(status || "")
+        ? status!
+        : "all"
+      setCurrentStatus(nextStatus)
+    }
+
+    window.addEventListener("popstate", handleHistoryChange)
+    return () => window.removeEventListener("popstate", handleHistoryChange)
+  }, [])
+
   const orders = data?.orders || []
   const variantMap = new Map(Object.entries(data?.variantMap || {}))
   const counts = data?.counts || {}
@@ -69,22 +129,44 @@ export function OrdersClient({ locale, initialStatus, translations }: OrdersClie
   return (
     <div className="bg-muted/10 sm:bg-card sm:border sm:border-border rounded-none overflow-hidden flex flex-col min-h-[400px] relative">
       {/* Tabs Header */}
-      <div className="flex overflow-x-auto border-b border-border bg-card hide-scrollbar sticky top-0 z-10">
-        {tabs.map((tab) => {
-          const isActive = currentStatus === tab.id
-          return (
-            <button
-              key={tab.id}
-              onClick={() => handleTabChange(tab.id)}
-              className={`flex-1 min-w-[100px] text-center py-2.5 px-2 text-xs font-medium transition-colors whitespace-nowrap border-b outline-none cursor-pointer ${isActive
-                  ? "text-primary border-primary font-semibold"
-                  : "text-muted-foreground hover:text-foreground border-transparent"
-                }`}
-            >
-              {tab.label} {counts[tab.id] !== undefined ? `(${counts[tab.id]})` : ""}
-            </button>
-          )
-        })}
+      <div className="sticky top-0 z-10 overflow-x-auto overscroll-x-contain border-b border-border bg-card hide-scrollbar">
+        <div
+          role="tablist"
+          aria-label={translations.sidebarOrderStatuses}
+          className="flex min-w-max snap-x snap-mandatory sm:min-w-full"
+        >
+          {tabs.map((tab) => {
+            const isActive = currentStatus === tab.id
+            const count = Number(counts[tab.id] ?? 0)
+
+            return (
+              <button
+                key={tab.id}
+                ref={(element) => {
+                  tabRefs.current[tab.id] = element
+                }}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => handleTabChange(tab.id)}
+                className={`relative flex min-w-[9.5rem] shrink-0 snap-center items-center justify-center gap-2 border-b-2 px-4 py-3 text-xs outline-none transition-colors sm:min-w-0 sm:flex-1 ${isActive
+                    ? "border-primary bg-primary/[0.04] font-bold text-primary"
+                    : "border-transparent font-medium text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+                  }`}
+              >
+                <span className="whitespace-nowrap">{tab.label}</span>
+                <span
+                  className={`min-w-5 border px-1.5 py-0.5 text-center text-[10px] tabular-nums ${isActive
+                      ? "border-primary/30 bg-primary/10 text-primary"
+                      : "border-border bg-muted/50 text-muted-foreground"
+                    }`}
+                >
+                  {count}
+                </span>
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       {/* Orders List */}
@@ -100,8 +182,8 @@ export function OrdersClient({ locale, initialStatus, translations }: OrdersClie
           </div>
         ) : (
           <div className={`space-y-2 sm:space-y-3 transition-opacity duration-200 ${isFetching ? "opacity-60" : "opacity-100"}`}>
-            {orders.map((order: any) => {
-              const totalItems = order.items.reduce((acc: number, item: any) => acc + item.quantity, 0);
+            {orders.map((order) => {
+              const totalItems = order.items.reduce((acc, item) => acc + item.quantity, 0);
 
               // Helper to translate status
               const getStatusText = (status: string) => {
@@ -127,8 +209,8 @@ export function OrdersClient({ locale, initialStatus, translations }: OrdersClie
 
                   {/* Items */}
                   <div className="px-2 py-2 sm:px-3 sm:py-3 space-y-2">
-                    {order.items.map((item: any) => {
-                      const variant: any = variantMap.get(item.variantId);
+                    {order.items.map((item) => {
+                      const variant = variantMap.get(item.variantId);
                       const imageUrl = variant?.product?.images?.[0]?.url || null;
 
                       return (
@@ -185,12 +267,12 @@ export function OrdersClient({ locale, initialStatus, translations }: OrdersClie
                       {(order.orderStatus === 'COMPLETED' || order.orderStatus === 'CANCELLED') && (
                         <BuyAgainButton
                           locale={locale}
-                          items={order.items.map((item: any) => {
-                            const variant: any = variantMap.get(item.variantId);
+                          items={order.items.map((item) => {
+                            const variant = variantMap.get(item.variantId);
                             return {
                               variantId: item.variantId,
                               productName: item.productName,
-                              variantName: item.variantName,
+                              variantName: item.variantName || undefined,
                               sku: item.sku,
                               price: Number(item.price),
                               quantity: item.quantity,
