@@ -29,7 +29,7 @@ export function Footer({ locale }: FooterProps) {
 
   return (
     <footer className="border-t bg-muted/20">
-      <div className="container mx-auto py-12 px-4 md:px-6">
+      <div className="storefront-container py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="space-y-4">
             <h3 className="text-lg font-bold">{storeName}</h3>
@@ -45,7 +45,7 @@ export function Footer({ locale }: FooterProps) {
           <div className="space-y-4">
             <h4 className="text-sm font-semibold">Company</h4>
             <ul className="space-y-2 text-sm text-muted-foreground">
-              <li><Link href={`/${locale}/about`}>About</Link></li>
+              <li><Link href={`/${locale}/pages/about-us`}>About</Link></li>
               <li><Link href={`/${locale}/contact`}>Contact</Link></li>
             </ul>
           </div>

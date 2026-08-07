@@ -11,7 +11,7 @@ import {
   SidebarMenuItem,
   SidebarFooter,
 } from "@/components/ui/sidebar"
-import { Package, LayoutDashboard, ShoppingCart, Users, Tag, Settings, FileText, LogOut, ChevronUp, Warehouse } from "lucide-react"
+import { Package, LayoutDashboard, ShoppingCart, Users, Tag, Settings, FileText, LogOut, ChevronUp, Warehouse, FolderTree, MessageSquareText } from "lucide-react"
 import { signOut } from "next-auth/react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import Link from "next/link"
 import { useQuery } from "@tanstack/react-query"
+import { useLocale, useTranslations } from "next-intl"
 
 const items = [
   {
@@ -33,6 +34,11 @@ const items = [
     title: "Products",
     url: "/admin/products",
     icon: Package,
+  },
+  {
+    title: "",
+    url: "/admin/categories",
+    icon: FolderTree,
   },
   {
     title: "Orders",
@@ -55,6 +61,11 @@ const items = [
     icon: Tag,
   },
   {
+    title: "Reviews",
+    url: "/admin/reviews",
+    icon: MessageSquareText,
+  },
+  {
     title: "Warehouses",
     url: "/admin/warehouses",
     icon: Warehouse,
@@ -67,6 +78,8 @@ const items = [
 ]
 
 export function AppSidebar({ user }: { user?: { name?: string | null; email?: string | null; image?: string | null } }) {
+  const locale = useLocale();
+  const categoryT = useTranslations("AdminCategories");
   const { data } = useQuery<{ settings: { storeName: string } }>({
     queryKey: ["store-settings"],
     queryFn: async () => {
@@ -87,10 +100,10 @@ export function AppSidebar({ user }: { user?: { name?: string | null; email?: st
           <SidebarGroupContent>
             <SidebarMenu className="gap-0.5">
               {items.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton render={<Link href={item.url} />} className="rounded-none h-8 text-xs hover:bg-muted/50 transition-colors">
+                <SidebarMenuItem key={item.url}>
+                  <SidebarMenuButton render={<Link href={`/${locale}${item.url}`} />} className="rounded-none h-8 text-xs hover:bg-muted/50 transition-colors">
                     <item.icon className="w-3.5 h-3.5 mr-2" />
-                    <span className="font-medium">{item.title}</span>
+                    <span className="font-medium">{item.url === "/admin/categories" ? categoryT("title") : item.title}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
@@ -124,7 +137,7 @@ export function AppSidebar({ user }: { user?: { name?: string | null; email?: st
                 className="w-[--radix-dropdown-menu-trigger-width] rounded-none border-border shadow-none"
               >
                 <DropdownMenuItem
-                  onClick={() => signOut({ callbackUrl: "/" })}
+                  onClick={() => signOut({ callbackUrl: `/${locale}` })}
                   className="text-destructive focus:bg-destructive/10 focus:text-destructive rounded-none text-xs font-bold uppercase tracking-wider cursor-pointer"
                 >
                   <LogOut className="mr-2 h-3.5 w-3.5" />

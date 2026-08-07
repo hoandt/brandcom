@@ -49,33 +49,33 @@
 }
 
 :root {
-  --background: hsl(350, 60%, 97%);
-  --foreground: hsl(30, 10%, 15%);
+  --background: hsl(36, 24%, 98%);
+  --foreground: hsl(24, 8%, 14%);
 
   --card: hsl(0, 0%, 100%);
-  --card-foreground: hsl(351, 12%, 12%);
+  --card-foreground: hsl(24, 8%, 14%);
 
   --popover: hsl(0, 0%, 100%);
-  --popover-foreground: hsl(351, 12%, 12%);
+  --popover-foreground: hsl(24, 8%, 14%);
 
-  --primary: hsl(354, 70%, 39%);
+  --primary: hsl(354, 68%, 40%);
   --primary-foreground: hsl(0, 0%, 100%);
 
-  --secondary: hsl(14, 32%, 87%);
-  --secondary-foreground: hsl(351, 20%, 27%);
+  --secondary: hsl(30, 12%, 94%);
+  --secondary-foreground: hsl(24, 8%, 22%);
 
-  --muted: hsl(0, 27%, 96%);
-  --muted-foreground: hsl(348, 8%, 28%);
+  --muted: hsl(30, 14%, 96%);
+  --muted-foreground: hsl(24, 6%, 40%);
 
-  --accent: hsl(352, 48%, 94%);
-  --accent-foreground: hsl(354, 70%, 34%);
+  --accent: hsl(354, 28%, 96%);
+  --accent-foreground: hsl(354, 68%, 36%);
 
   --destructive: hsl(354, 56%, 51%);
   --destructive-foreground: hsl(0, 0%, 100%);
 
-  --border: hsl(353, 26%, 87%);
-  --input: hsl(353, 26%, 87%);
-  --ring: hsl(354, 70%, 39%);
+  --border: hsl(30, 10%, 88%);
+  --input: hsl(30, 10%, 88%);
+  --ring: hsl(354, 68%, 40%);
 
   --radius: 1rem;
 }
@@ -116,10 +116,7 @@
   }
   body {
     @apply bg-background text-foreground font-normal antialiased;
-    background-image:
-      radial-gradient(circle at 50% -20%, hsl(40, 50%, 99%) 0%, transparent 70%),
-      radial-gradient(circle at 100% 100%, hsl(15, 30%, 96%) 0%, transparent 60%);
-    background-attachment: fixed;
+    background-image: none;
   }
   html {
     @apply font-sans;
@@ -143,4 +140,8 @@
     transition: background-color 5000s ease-in-out 0s;
     box-shadow: inset 0 0 20px 20px transparent !important;
   }
+}
+
+@utility storefront-container {
+  @apply mx-auto w-full max-w-[1440px] px-4 sm:px-6 lg:px-8;
 }

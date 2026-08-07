@@ -10,6 +10,7 @@ import { formatPrice } from "@/lib/utils";
 import { ChevronLeft, ChevronRight, ShoppingBag } from "lucide-react";
 import { ProductVouchers } from "@/components/store/product-vouchers";
 import { useQuery } from "@tanstack/react-query";
+import { ProductRatingInline, ProductReviews } from "@/components/storefront/product-reviews";
 
 type Variant = {
   id: string;
@@ -52,7 +53,6 @@ export function ProductClient({ product, details }: ProductClientProps) {
     staleTime: 5 * 60_000,
     refetchOnWindowFocus: false,
   });
-  const storeName = storeSettingsData?.settings.storeName || "Store";
   const currency = storeSettingsData?.settings.currency;
 
   const [selectedVariantId, setSelectedVariantId] = useState<string>(() => {
@@ -90,8 +90,22 @@ export function ProductClient({ product, details }: ProductClientProps) {
     }
   });
 
+  const displayImages = [...allImages];
+  if (activeImageIdx > 0 && activeImageIdx < displayImages.length) {
+    const temp = displayImages[0];
+    displayImages[0] = displayImages[activeImageIdx];
+    displayImages[activeImageIdx] = temp;
+  }
+
   const selectedVariant = product.variants.find((v) => v.id === selectedVariantId);
-  const isOutOfStock = selectedVariant ? selectedVariant.stock <= 0 : true;
+  const selectedStock = selectedVariant?.stock ?? 0;
+  const isOutOfStock = selectedStock <= 0;
+  const normalizedTitleLength = product.name.trim().length;
+  const titleSizeClass = normalizedTitleLength > 64
+    ? "text-[1.85rem] lg:text-[2.15rem]"
+    : normalizedTitleLength > 36
+      ? "text-[2rem] lg:text-[2.55rem]"
+      : "text-[2.25rem] lg:text-[3.1rem]";
 
   const handleVariantSelect = (variantId: string) => {
     setSelectedVariantId(variantId);
@@ -120,21 +134,22 @@ export function ProductClient({ product, details }: ProductClientProps) {
   };
 
   const handlePrevImage = () => {
-    setActiveImageIdx((prev) => (prev === 0 ? allImages.length - 1 : prev - 1));
+    setActiveImageIdx((prev) => (prev === 0 ? Math.min(allImages.length, 6) - 1 : prev - 1));
   };
 
   const handleNextImage = () => {
-    setActiveImageIdx((prev) => (prev === allImages.length - 1 ? 0 : prev + 1));
+    setActiveImageIdx((prev) => (prev === Math.min(allImages.length, 6) - 1 ? 0 : prev + 1));
   };
 
   return (
-    <div className="flex flex-col lg:grid lg:grid-cols-2 gap-8 lg:gap-12 xl:gap-16 items-start pb-24 lg:pb-0">
+    <div className="flex w-full flex-col pb-24 lg:pb-10">
+      <div className="flex flex-col items-start lg:grid lg:grid-cols-[7fr_6fr] lg:gap-x-0">
       {/* Left Column: Interactive Image Gallery & Accordions */}
-      <div className="contents lg:flex lg:flex-col lg:space-y-8 lg:w-full">
+      <div className="contents lg:flex lg:w-full lg:flex-col lg:space-y-6">
 
-        {/* Image Gallery */}
-        <div className="order-1 flex flex-col space-y-4 w-full lg:w-auto">
-          <div className="relative aspect-[1/1] sm:aspect-[4/5] w-full bg-secondary overflow-hidden rounded-xl group shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-border/50">
+        {/* Mobile Image Gallery (Slideshow) */}
+        <div className="order-1 flex w-full flex-col lg:hidden">
+          <div className="group relative aspect-[4/5] w-full overflow-hidden bg-muted/40">
             {allImages[activeImageIdx] ? (
               <Image
                 src={allImages[activeImageIdx].url}
@@ -145,8 +160,8 @@ export function ProductClient({ product, details }: ProductClientProps) {
                 priority
               />
             ) : (
-              <div className="flex items-center justify-center h-full">
-                <span className="text-muted-foreground uppercase tracking-widest text-xs">No Image Available</span>
+              <div className="flex h-full items-center justify-center">
+                <span className="text-xs uppercase tracking-widest text-muted-foreground">No Image Available</span>
               </div>
             )}
 
@@ -155,14 +170,14 @@ export function ProductClient({ product, details }: ProductClientProps) {
               <>
                 <button
                   onClick={handlePrevImage}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-background/80 hover:bg-background text-foreground flex items-center justify-center shadow-md transition-all opacity-0 group-hover:opacity-100"
+                  className="absolute left-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center border border-foreground/15 bg-background/90 text-foreground opacity-90 transition-all hover:border-foreground/50 active:scale-95"
                   aria-label="Previous image"
                 >
                   <ChevronLeft className="h-5 w-5" />
                 </button>
                 <button
                   onClick={handleNextImage}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-background/80 hover:bg-background text-foreground flex items-center justify-center shadow-md transition-all opacity-0 group-hover:opacity-100"
+                  className="absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center border border-foreground/15 bg-background/90 text-foreground opacity-90 transition-all hover:border-foreground/50 active:scale-95"
                   aria-label="Next image"
                 >
                   <ChevronRight className="h-5 w-5" />
@@ -172,44 +187,56 @@ export function ProductClient({ product, details }: ProductClientProps) {
 
             {/* Badge */}
             {selectedVariant?.comparePrice && (
-              <div className="absolute top-4 left-4 bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full shadow-sm">
+              <div className="absolute left-3 top-3 bg-foreground px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-background">
                 Sale
-              </div>
-            )}
-
-            {/* Slide Indicator */}
-            {allImages.length > 1 && (
-              <div className="absolute bottom-4 right-4 bg-background/80 backdrop-blur-md text-foreground text-xs font-bold tracking-wider px-3 py-1 rounded-full shadow-sm">
-                {activeImageIdx + 1} / {allImages.length}
               </div>
             )}
           </div>
 
-          {/* Thumbnails list */}
+          {/* Bullet Navigation */}
           {allImages.length > 1 && (
-            <div className="flex gap-3 overflow-x-auto p-2 scrollbar-thin justify-center">
-              {allImages.map((img, idx) => (
+            <div className="flex justify-center gap-2 pb-4 pt-3">
+              {allImages.slice(0, 6).map((_, idx) => (
                 <button
                   key={idx}
                   onClick={() => setActiveImageIdx(idx)}
-                  className={`relative w-16 h-20 sm:w-20 sm:h-24 rounded-lg bg-secondary overflow-hidden shrink-0 transition-all ${activeImageIdx === idx ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : "border border-border opacity-70 hover:opacity-100"
-                    }`}
-                >
-                  <Image
-                    src={img.url}
-                    alt={`${product.name} Thumbnail ${idx + 1}`}
-                    fill
-                    className="object-cover"
-                    sizes="80px"
-                  />
-                </button>
+                  className={`h-1.5 rounded-full transition-all duration-300 ${activeImageIdx === idx ? "w-6 bg-foreground" : "w-1.5 bg-border hover:bg-foreground/40"}`}
+                  aria-label={`Go to slide ${idx + 1}`}
+                />
               ))}
             </div>
           )}
         </div>
 
+        {/* Desktop Image Gallery (Grid) */}
+        <div className="order-1 hidden lg:grid w-full grid-cols-2">
+          {displayImages.length > 0 ? (
+            displayImages.slice(0, 6).map((img, idx) => (
+              <div key={idx} className="relative aspect-[3/4] w-full overflow-hidden bg-muted/40">
+                {selectedVariant?.comparePrice && idx === 0 && (
+                  <div className="absolute left-2 top-2 z-10 bg-foreground px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-background">
+                    Sale
+                  </div>
+                )}
+                <Image
+                  src={img.url}
+                  alt={`${product.name} - Image ${idx + 1}`}
+                  fill
+                  className="object-cover transition-transform duration-700 hover:scale-105"
+                  sizes="(max-width: 1024px) 50vw, 30vw"
+                  priority={idx < 2}
+                />
+              </div>
+            ))
+          ) : (
+            <div className="col-span-2 relative aspect-[3/4] w-full overflow-hidden bg-muted/40 flex items-center justify-center">
+              <span className="text-muted-foreground uppercase tracking-widest text-xs">No Image Available</span>
+            </div>
+          )}
+        </div>
+
         {/* Collapsible details panels */}
-        <div className="order-3 border-t border-border/60 divide-y divide-border/60 w-full lg:w-auto">
+        <div className="order-3 border-t border-border/60 divide-y divide-border/60 w-full px-4 sm:px-6 lg:px-0">
           {details.overview && (
             <details className="py-4 group" open>
               <summary className="flex justify-between items-center cursor-pointer font-bold uppercase tracking-widest text-xs list-none">
@@ -273,32 +300,16 @@ export function ProductClient({ product, details }: ProductClientProps) {
       </div>
 
       {/* Right Column: Sticky Sidebar */}
-      <div className="order-2 lg:sticky lg:top-28 flex flex-col gap-6 pb-24 lg:pb-32 w-full lg:w-auto">
+      <div className="order-2 flex w-full min-w-0 flex-col gap-2 pb-8 px-2 sm:px-4 lg:sticky lg:top-24 lg:w-auto lg:pl-4 xl:pl-8 lg:pr-2 lg:pt-4">
 
         {/* Header Section (Breadcrumbs, Rating, Title) */}
-        <div className="flex flex-col gap-2.5">
-          {/* Breadcrumbs */}
-          <div className="text-[11px] text-muted-foreground font-light tracking-wide uppercase flex items-center gap-1.5">
-            <span>Home</span>
-            <span>/</span>
-            <span>All Products</span>
-            <span>/</span>
-            <span className="text-foreground font-normal">{product.name}</span>
-          </div>
-
+        <div className="flex flex-col gap-2 border-b border-border/70 pb-4">
           {/* Rating Stars & Reviews */}
-          <div className="flex items-center gap-1.5 mt-1">
-            <div className="flex text-amber-500">
-              {"★★★★★".split("").map((star, i) => (
-                <span key={i} className="text-sm">★</span>
-              ))}
-            </div>
-            <span className="text-xs text-muted-foreground font-light hover:underline cursor-pointer">4.8/5 Excellent • 7000+ reviews</span>
-          </div>
+          <ProductRatingInline productId={product.id} />
 
           {/* Product Title */}
           <div>
-            <h1 className="text-3xl lg:text-4xl font-heading uppercase tracking-widest text-primary font-bold">
+            <h1 className={`max-w-[22ch] text-pretty break-words font-heading font-medium leading-[1.03] tracking-[0.025em] text-foreground/80 [hyphens:auto] ${titleSizeClass}`}>
               {product.name}
             </h1>
           </div>
@@ -308,14 +319,14 @@ export function ProductClient({ product, details }: ProductClientProps) {
         <ProductVouchers productId={product.id} />
 
         {/* Purchase Options Section */}
-        <div className="bg-white dark:bg-neutral-900 rounded-2xl shadow-[0_2px_16px_rgba(0,0,0,0.06)] p-5 flex flex-col gap-5">
+        <div className="flex flex-col gap-4 border border-border/80 bg-card p-4">
           {/* Select Unit Variant Cards */}
           {product.variants.length > 0 && (
             <div className="space-y-3">
               <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground block">
-                Color & Size
+                {t("colorAndSize")}
               </span>
-              <div className="flex flex-wrap gap-2.5">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
                 {product.variants.map((v) => {
                   const isSelected = selectedVariantId === v.id;
                   const vInCart = items.find((item) => item.variantId === v.id);
@@ -326,14 +337,14 @@ export function ProductClient({ product, details }: ProductClientProps) {
                       key={v.id}
                       type="button"
                       onClick={() => handleVariantSelect(v.id)}
-                      className={`relative px-4 py-2.5 border-2 rounded-xl text-center transition-all ${isSelected
-                        ? "border-primary bg-primary/[0.06] text-primary shadow-sm"
-                        : "border-transparent bg-muted/40 hover:bg-muted/70 text-foreground/80 hover:text-foreground"
+                      className={`relative min-w-0 border px-3 py-2.5 text-center transition-all ${isSelected
+                        ? "border-primary bg-primary/[0.04] text-primary"
+                        : "border-border bg-background text-foreground/80 hover:border-foreground/40 hover:text-foreground"
                         } ${v.stock <= 0 ? "opacity-40 cursor-not-allowed" : ""}`}
                       disabled={v.stock <= 0}
                     >
                       {vQty > 0 && (
-                        <div className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-[9px] font-bold shadow-sm z-10">
+                        <div className="absolute -right-1.5 -top-1.5 z-10 flex h-4 w-4 items-center justify-center bg-primary text-[9px] font-bold text-primary-foreground">
                           {vQty}
                         </div>
                       )}
@@ -348,15 +359,15 @@ export function ProductClient({ product, details }: ProductClientProps) {
           <hr className="border-border/40" />
 
           {/* Horizontal Actions Block */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
+          <div className="grid items-center gap-5 xl:grid-cols-[minmax(0,1fr)_auto]">
             {/* Active Pricing */}
-            <div className="space-y-1">
-              <div className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
+            <div className="min-w-0 space-y-1">
+              <div className="truncate text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                 {selectedVariant?.name} Price
               </div>
               {selectedVariant && (
-                <div className="flex items-baseline gap-2">
-                  <span className="text-2xl font-black text-foreground tracking-tight">
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                  <span className="whitespace-nowrap text-[clamp(1.75rem,3vw,2rem)] font-black tracking-tight text-primary">
                     {formatPrice(selectedVariant.price, locale, currency)}
                   </span>
                   {selectedVariant.comparePrice && (
@@ -367,15 +378,15 @@ export function ProductClient({ product, details }: ProductClientProps) {
                 </div>
               )}
               <div className="text-[9px] text-muted-foreground/80 font-light">
-                (Inclusive of all taxes)
+                ({t("taxInclusive")})
               </div>
             </div>
 
             {/* Quantity Selector & Add Button */}
-            <div className={`flex items-center gap-3 w-full sm:w-auto transition-transform duration-300 ${isBumping ? "scale-[1.03]" : "scale-100"}`}>
+            <div className={`flex w-full items-center gap-2 transition-transform duration-300 xl:w-auto ${isBumping ? "scale-[1.02]" : "scale-100"}`}>
               {cartQuantity === 0 ? (
                 <Button
-                  className="h-14 rounded-2xl bg-primary hover:bg-primary/90 text-primary-foreground text-sm tracking-wider font-bold uppercase px-8 w-full sm:min-w-[160px] shadow-xl shadow-primary/25 transition-all"
+                  className="h-12 w-full rounded-none bg-primary px-7 text-sm font-bold uppercase tracking-wider text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 sm:min-w-[170px]"
                   disabled={isOutOfStock}
                   onClick={handleAddToCart}
                 >
@@ -383,7 +394,7 @@ export function ProductClient({ product, details }: ProductClientProps) {
                 </Button>
               ) : (
                 <div className="flex items-center gap-2 w-full sm:w-auto">
-                  <div className="flex items-center h-14 rounded-2xl bg-secondary text-foreground overflow-hidden shrink-0 shadow-sm border border-border/40">
+                  <div className="flex h-12 shrink-0 items-center overflow-hidden border bg-secondary text-foreground">
                     <button
                       type="button"
                       onClick={() => {
@@ -411,7 +422,7 @@ export function ProductClient({ product, details }: ProductClientProps) {
                   </div>
                   <Button
                     onClick={() => router.push(`/${locale}/checkout`)}
-                    className="h-14 flex-1 sm:min-w-[140px] rounded-2xl bg-primary hover:bg-primary/90 text-primary-foreground text-sm tracking-wider font-bold uppercase shadow-xl shadow-primary/25 transition-all flex items-center justify-center gap-2"
+                    className="flex h-12 flex-1 items-center justify-center gap-2 rounded-none bg-primary text-sm font-bold uppercase tracking-wider text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 sm:min-w-[140px]"
                   >
                     <ShoppingBag className="w-4 h-4" />
                     <span>{locale === "vi" ? "Thanh toán" : "Checkout"}</span>
@@ -423,15 +434,19 @@ export function ProductClient({ product, details }: ProductClientProps) {
 
           {/* Stock status indicator */}
           <div className="flex items-center gap-2 text-xs font-light">
-            <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${isOutOfStock ? "bg-destructive" : "bg-primary animate-pulse"}`} />
+            <span className={`h-2 w-2 shrink-0 rounded-full ${isOutOfStock ? "bg-muted-foreground/50" : "bg-primary"}`} />
             <span className="text-muted-foreground">
-              {isOutOfStock ? "Out of Stock" : "In Stock - Ready to ship"}
+              {isOutOfStock
+                ? "Out of stock"
+                : selectedStock < 10
+                  ? locale === "vi" ? `Chỉ còn ${selectedStock}` : `${selectedStock} left`
+                  : "In stock"}
             </span>
           </div>
         </div>
 
         {/* Why shop from AURIA? */}
-        <div className="bg-white dark:bg-neutral-900 rounded-2xl shadow-[0_2px_16px_rgba(0,0,0,0.06)] p-5">
+        {/* <div className="border border-border/80 bg-card p-4">
           <h3 className="font-semibold text-[10px] uppercase tracking-widest text-muted-foreground mb-3">Why shop from {storeName}?</h3>
           <div className="space-y-3">
             <div className="flex gap-2.5 items-start text-xs">
@@ -455,13 +470,16 @@ export function ProductClient({ product, details }: ProductClientProps) {
               </div>
             </div>
           </div>
-        </div>
+        </div> */}
 
       </div>
+      </div>
+
+      <ProductReviews productId={product.id} productName={product.name} />
 
       {/* Mobile Sticky Footer Add to Cart */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 p-4 bg-background border-t border-border z-50 shadow-[0_-4px_12px_rgba(0,0,0,0.05)]">
-        <div className={`flex items-center gap-4 transition-transform duration-300 ${isBumping ? "scale-[1.02]" : "scale-100"}`}>
+      <div className="fixed inset-x-0 bottom-0 z-50 border-t bg-background px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 lg:hidden">
+        <div className={`flex items-center gap-3 transition-transform duration-300 ${isBumping ? "scale-[1.01]" : "scale-100"}`}>
           <div className="flex flex-col flex-1">
             <span className="text-sm font-bold text-foreground">
               {selectedVariant ? formatPrice(selectedVariant.price, locale, currency) : ""}
@@ -474,7 +492,7 @@ export function ProductClient({ product, details }: ProductClientProps) {
           </div>
           {cartQuantity === 0 ? (
             <Button
-              className="h-14 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-bold uppercase px-8 flex-shrink-0 shadow-sm"
+              className="h-12 flex-shrink-0 rounded-none bg-primary px-7 text-sm font-bold uppercase text-primary-foreground shadow-sm hover:bg-primary/90"
               disabled={isOutOfStock}
               onClick={handleAddToCart}
             >
@@ -482,7 +500,7 @@ export function ProductClient({ product, details }: ProductClientProps) {
             </Button>
           ) : (
             <div className="flex items-center gap-2 shrink-0">
-              <div className="flex items-center h-14 rounded-full bg-secondary text-foreground overflow-hidden shrink-0 shadow-sm border border-border/40">
+              <div className="flex h-12 shrink-0 items-center overflow-hidden border bg-secondary text-foreground">
                 <button
                   type="button"
                   onClick={() => {
@@ -510,7 +528,7 @@ export function ProductClient({ product, details }: ProductClientProps) {
               </div>
               <Button
                 onClick={() => router.push(`/${locale}/checkout`)}
-                className="h-14 w-14 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground flex-shrink-0 shadow-xl shadow-primary/25 flex items-center justify-center p-0"
+                className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-none bg-primary p-0 text-primary-foreground shadow-sm hover:bg-primary/90"
                 aria-label={locale === "vi" ? "Thanh toán" : "Checkout"}
               >
                 <ShoppingBag className="w-5 h-5" />

@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react"
+import { createPortal } from "react-dom"
 import { usePathname, useRouter } from "next/navigation"
 import Link from "next/link"
+import Image from "next/image"
 import { Logo } from "@/components/ui/logo"
-import { ShoppingBag, Search, Menu, ClipboardList, User, ChevronDown, Globe } from "lucide-react"
+import { Search, Menu, User, ChevronDown, Globe, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
 import { useTranslations, useLocale } from "next-intl"
 import { LanguageSwitcher } from "./language-switcher"
 import { CartIcon } from "./cart-icon"
@@ -22,6 +23,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { signOut } from "next-auth/react"
 import type { Session } from "next-auth"
+import { DesktopCategoryMenu, MobileCategoryMenu } from "./category-navigation"
 
 export function Navbar({ session }: { session: Session | null }) {
   const [isScrolled, setIsScrolled] = useState(false)
@@ -31,6 +33,7 @@ export function Navbar({ session }: { session: Session | null }) {
   const tAccount = useTranslations("Account")
   const locale = useLocale()
   const [isSearchOpen, setIsSearchOpen] = useState(false)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   const switchLanguage = (newLocale: string) => {
     if (newLocale === locale) return;
@@ -53,8 +56,26 @@ export function Navbar({ session }: { session: Session | null }) {
     return () => window.removeEventListener("scroll", handleScroll)
   }, [])
 
+  useEffect(() => {
+    if (!isMobileMenuOpen) return
+
+    const previousOverflow = document.body.style.overflow
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsMobileMenuOpen(false)
+    }
+
+    document.body.style.overflow = "hidden"
+    window.addEventListener("keydown", handleKeyDown)
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [isMobileMenuOpen])
+
   const isHomepage = pathname === `/${locale}` || pathname === "/"
   const isTransparent = isHomepage && !isScrolled
+  const isShopActive = ["/collections/", "/categories/", "/products/"].some((segment) => pathname.includes(segment))
 
   return (
     <header
@@ -63,7 +84,7 @@ export function Navbar({ session }: { session: Session | null }) {
         : "bg-background/70 backdrop-blur-xl border-b border-border/50 shadow-sm"
         }`}
     >
-      <div className={`container mx-auto flex h-20 items-center justify-between px-4 md:px-8 transition-colors duration-300 ${isTransparent ? "text-white" : "text-foreground"}`}>
+      <div className={`storefront-container flex h-20 items-center justify-between transition-colors duration-300 ${isTransparent ? "text-white" : "text-foreground"}`}>
 
         {/* Left Section: Logo & Desktop Links */}
         <div className="flex items-center gap-10">
@@ -71,10 +92,9 @@ export function Navbar({ session }: { session: Session | null }) {
             <Logo className={`h-12 md:h-14 w-auto ${isTransparent ? "text-white" : "text-primary"}`} />
           </Link>
 
-          <nav className="hidden md:flex gap-8 text-[0.85rem] font-bold uppercase tracking-[0.15em] whitespace-nowrap">
-            <Link href={`/${locale}/collections/new`} className={`${isTransparent ? "text-white/90 hover:text-white" : "text-muted-foreground hover:text-foreground"} hover:underline underline-offset-[12px] transition-all decoration-2`}>{t("newArrivals")}</Link>
-            <Link href={`/${locale}/collections/all`} className={`${isTransparent ? "text-white/90 hover:text-white" : "text-muted-foreground hover:text-foreground"} hover:underline underline-offset-[12px] transition-all decoration-2`}>{t("allProducts")}</Link>
-            <Link href={`/${locale}/about`} className={`${isTransparent ? "text-white/90 hover:text-white" : "text-muted-foreground hover:text-foreground"} hover:underline underline-offset-[12px] transition-all decoration-2`}>{t("aboutUs")}</Link>
+          <nav className="hidden h-20 items-center gap-8 whitespace-nowrap text-[0.85rem] font-bold uppercase tracking-[0.15em] md:flex">
+            <DesktopCategoryMenu transparent={isTransparent} active={isShopActive} />
+            <Link href={`/${locale}/pages/about-us`} className={`${isTransparent ? "text-white/90 hover:text-white" : "text-muted-foreground hover:text-foreground"} border-b-2 border-transparent py-3 font-heading text-[0.85rem] font-bold uppercase tracking-[0.15em] outline-none transition-colors hover:border-current focus-visible:outline-none focus-visible:ring-0`}>{t("aboutUs")}</Link>
           </nav>
         </div>
 
@@ -112,7 +132,7 @@ export function Navbar({ session }: { session: Session | null }) {
                     <button className={`flex items-center gap-1 px-2 py-1 outline-none cursor-pointer rounded-none hover:bg-muted/10 ${isTransparent ? "text-white" : "text-foreground"}`}>
                       <div className="w-5 h-5 rounded-none bg-primary/10 flex items-center justify-center text-primary font-bold text-[10px] uppercase overflow-hidden shrink-0 border border-primary/20">
                         {session.user.image ? (
-                          <img src={session.user.image} alt={session.user.name || "User"} className="w-full h-full object-cover" />
+                          <Image src={session.user.image} alt={session.user.name || "User"} width={20} height={20} unoptimized className="h-full w-full object-cover" />
                         ) : (
                           session.user.name?.charAt(0) || "U"
                         )}
@@ -175,26 +195,35 @@ export function Navbar({ session }: { session: Session | null }) {
 
 
             {/* Hamburger Menu on Right on Mobile */}
-            <Sheet>
-              <SheetTrigger
-                render={
-                  <Button variant="ghost" size="icon" className="md:hidden">
-                    <Menu className="h-6 w-6" />
-                  </Button>
-                }
-              />
-              <SheetContent side="right" className="font-heading uppercase tracking-widest text-foreground">
-                <SheetTitle className="sr-only">{t("menu")}</SheetTitle>
-                <nav className="grid gap-6 text-lg font-medium mt-12">
-                  <Link href={`/${locale}`} className="flex items-center mb-6">
-                    <Logo className="h-10 w-auto text-primary" />
-                  </Link>
-                  <Link href={`/${locale}/collections/new`} className="hover:text-primary transition-colors">{t("newArrivals")}</Link>
-                  <Link href={`/${locale}/collections/all`} className="hover:text-primary transition-colors">{t("allProducts")}</Link>
-                  <Link href={`/${locale}/about`} className="hover:text-primary transition-colors">{t("aboutUs")}</Link>
-                </nav>
-              </SheetContent>
-            </Sheet>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={t("menu")}
+              aria-expanded={isMobileMenuOpen}
+              aria-controls="mobile-catalogue-menu"
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="md:hidden"
+            >
+              <Menu className="h-6 w-6" />
+            </Button>
+            {isMobileMenuOpen && typeof document !== "undefined" && createPortal(
+              <div
+                id="mobile-catalogue-menu"
+                role="dialog"
+                aria-modal="true"
+                aria-label={t("menu")}
+                className="fixed inset-0 z-[100] flex h-dvh w-screen flex-col overflow-hidden bg-background font-heading text-foreground animate-in fade-in duration-150 md:hidden"
+              >
+                <div className="storefront-container flex h-20 shrink-0 items-center border-b">
+                  <Link href={`/${locale}`} onClick={() => setIsMobileMenuOpen(false)}><Logo className="h-11 w-auto text-primary" /></Link>
+                  <span className="ml-auto mr-4 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{locale}</span>
+                  <button type="button" onClick={() => setIsMobileMenuOpen(false)} className="flex h-11 w-11 items-center justify-center border outline-none hover:border-primary hover:text-primary focus-visible:border-primary" aria-label={t("closeMenu")}><X className="h-5 w-5" /></button>
+                </div>
+                <MobileCategoryMenu onNavigate={() => setIsMobileMenuOpen(false)} />
+              </div>,
+              document.body,
+            )}
           </div>
         </div>
       </div>

@@ -22,7 +22,7 @@ export async function FeaturedProducts({ locale }: { locale: string }) {
   })
 
   return (
-    <section className="py-24 px-4 md:px-8 container mx-auto">
+    <section className="storefront-container py-24">
       <div className="flex items-end justify-between mb-12">
         <div>
           <h2 className="text-2xl md:text-3xl font-heading uppercase tracking-widest mb-2">{t("newArrivals")}</h2>
@@ -85,7 +85,7 @@ export async function FeaturedProducts({ locale }: { locale: string }) {
 
 export function FeaturedProductsSkeleton() {
   return (
-    <section className="py-24 px-4 md:px-8 container mx-auto">
+    <section className="storefront-container py-24">
       <div className="flex items-end justify-between mb-12">
         <div className="space-y-4">
           <div className="h-8 w-48 bg-secondary/50 animate-pulse rounded-md" />

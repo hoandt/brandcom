@@ -169,20 +169,29 @@ export default function CheckoutPage() {
   const customerPhoneWatch = watch("customerPhone");
   const spxMappings = locationWatch?.ward?.shipping_mappings?.spx;
   const firstSpxMapping = Array.isArray(spxMappings) ? spxMappings[0] : spxMappings;
+  const hasValidSpxMapping = Boolean(
+    firstSpxMapping &&
+    typeof firstSpxMapping.province === "string" && firstSpxMapping.province.trim() &&
+    typeof firstSpxMapping.district === "string" && firstSpxMapping.district.trim() &&
+    typeof firstSpxMapping.ward === "string" && firstSpxMapping.ward.trim()
+  );
   const canCalculateShipping = Boolean(
-    locationWatch?.province &&
-    (firstSpxMapping || locationWatch?.district) &&
+    locationWatch?.province && locationWatch?.ward &&
     cartItems.length > 0
   );
 
+  const currentPaymentMethod = watch("paymentMethod") || "VNPAY";
+  const isCod = currentPaymentMethod === "Cash on Delivery" || currentPaymentMethod === "COD";
+  const subtotal = cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
+
   const { data: dynamicShippingFee, isLoading: isCalculatingShipping } = useQuery({
-    queryKey: ["shipping-fee", firstSpxMapping, locationWatch?.district, addressWatch, cartItems],
+    queryKey: ["shipping-fee", firstSpxMapping, locationWatch?.district, addressWatch, cartItems, isCod, subtotal],
     queryFn: async () => {
       if (!canCalculateShipping) {
         return 0;
       }
 
-      let shippingLocation = firstSpxMapping;
+      let shippingLocation = hasValidSpxMapping ? firstSpxMapping : undefined;
       if (!shippingLocation && locationWatch?.province?.location_id && locationWatch?.ward?.location_id) {
         const wardsRes = await fetch(
           `/api/locations/wards?province_id=${encodeURIComponent(locationWatch.province.location_id)}`
@@ -196,27 +205,37 @@ export default function CheckoutPage() {
               )
             : undefined;
           const mappings = selectedWard?.shipping_mappings?.spx;
-          shippingLocation = Array.isArray(mappings) ? mappings[0] : mappings;
+          const resolvedMapping = Array.isArray(mappings) ? mappings[0] : mappings;
+          if (
+            resolvedMapping &&
+            typeof resolvedMapping.province === "string" && resolvedMapping.province.trim() &&
+            typeof resolvedMapping.district === "string" && resolvedMapping.district.trim() &&
+            typeof resolvedMapping.ward === "string" && resolvedMapping.ward.trim()
+          ) {
+            shippingLocation = resolvedMapping;
+          }
         }
       }
+
+      if (!shippingLocation) return fallbackShippingFee;
 
       const res = await fetch("/api/shipping/calculate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          location: shippingLocation
-            ? {
-                province: shippingLocation.province,
-                district: shippingLocation.district,
-                ward: shippingLocation.ward,
-                detailAddress: addressWatch,
-              }
-            : { ...locationWatch, detailAddress: addressWatch },
+          location: {
+            province: shippingLocation.province,
+            district: shippingLocation.district,
+            ward: shippingLocation.ward,
+            detailAddress: addressWatch,
+          },
           items: cartItems,
           recipient: {
             name: customerNameWatch,
             phone: customerPhoneWatch,
           },
+          isCod,
+          codAmount: subtotal,
         }),
       });
       if (!res.ok) {
@@ -230,7 +249,6 @@ export default function CheckoutPage() {
     staleTime: 1000 * 60 * 5,
   });
 
-  const subtotal = cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
   const cartItemCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
 
   // If user hasn't selected address, shipping is 0 to not charge them randomly, but we will prompt them.
@@ -303,8 +321,6 @@ export default function CheckoutPage() {
       router.push(`/${locale}/account/orders/${data.orderId}`);
     },
   });
-
-  const currentPaymentMethod = watch("paymentMethod") || "VNPAY";
 
   const paymentOptions = [
     {

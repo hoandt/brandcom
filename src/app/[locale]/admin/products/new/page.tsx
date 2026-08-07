@@ -6,8 +6,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useRouter } from "next/navigation"
 import { MarkdownEditor } from "@/components/admin/markdown-editor"
-import { Boxes, X, Image as ImageIcon } from "lucide-react"
+import { Boxes, X, Image as ImageIcon, Star } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { CategoryPicker } from "@/components/admin/category-picker"
+import { useQuery } from "@tanstack/react-query"
+import { useLocale } from "next-intl"
 
 // Port of slugify utility for client-side use
 function clientSlugify(text: string): string {
@@ -54,20 +57,31 @@ const getCombinations = (arrays: string[][]): string[][] => {
 
 export default function NewProductPage() {
   const router = useRouter()
+  const locale = useLocale()
   const [loading, setLoading] = useState(false)
   const [name, setName] = useState("")
   const [slug, setSlug] = useState("")
   const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false)
   const [images, setImages] = useState<File[]>([])
   const [imagePreviews, setImagePreviews] = useState<string[]>([])
+  const [mainImageIndex, setMainImageIndex] = useState<number | null>(null)
 
   // Track details fields states locally
   const [description, setDescription] = useState("")
   const [overview, setOverview] = useState("")
   const [materials, setMaterials] = useState("")
   const [care, setCare] = useState("")
-  const [warehouses, setWarehouses] = useState<{ id: string; name: string; code: string; isDefault: boolean; isPickup: boolean }[]>([])
+  const [categoryIds, setCategoryIds] = useState<string[]>([])
   const [inventoryVariantIndex, setInventoryVariantIndex] = useState<number | null>(null)
+  const warehouseQuery = useQuery<{ warehouses: { id: string; name: string; code: string; isDefault: boolean; isPickup: boolean }[] }>({
+    queryKey: ["admin-warehouses"],
+    queryFn: async () => {
+      const response = await fetch("/api/admin/warehouses")
+      if (!response.ok) throw new Error("Failed to load warehouses")
+      return response.json()
+    },
+  })
+  const warehouses = warehouseQuery.data?.warehouses ?? []
 
   // Attribute matrix states
   const [attributes, setAttributes] = useState<Attribute[]>([
@@ -81,13 +95,6 @@ export default function NewProductPage() {
   // Bulk editor states
   const [bulkPrice, setBulkPrice] = useState("")
   const [bulkSku, setBulkSku] = useState("")
-
-  useEffect(() => {
-    fetch("/api/admin/warehouses")
-      .then((response) => response.ok ? response.json() : Promise.reject(new Error("Failed to load warehouses")))
-      .then((data) => setWarehouses(data.warehouses || []))
-      .catch((error) => console.error(error));
-  }, []);
 
   // Cartesian combinations effect
   useEffect(() => {
@@ -140,6 +147,7 @@ export default function NewProductPage() {
 
       const previews = selectedFiles.map((file) => URL.createObjectURL(file));
       setImagePreviews((prev) => [...prev, ...previews]);
+      if (mainImageIndex === null && selectedFiles.length > 0) setMainImageIndex(images.length);
     }
   };
 
@@ -148,6 +156,12 @@ export default function NewProductPage() {
     setImagePreviews((prev) => {
       URL.revokeObjectURL(prev[index]);
       return prev.filter((_, i) => i !== index);
+    });
+    setMainImageIndex((current) => {
+      if (images.length <= 1) return null;
+      if (current === null) return 0;
+      if (current === index) return 0;
+      return current > index ? current - 1 : current;
     });
   };
 
@@ -248,6 +262,7 @@ export default function NewProductPage() {
     formData.set("overview", overview);
     formData.set("materials", materials);
     formData.set("care", care);
+    formData.set("categoryIds", JSON.stringify(categoryIds));
 
     // Append variants array as JSON string
     formData.append("variants", JSON.stringify(variants.map(v => ({
@@ -260,7 +275,10 @@ export default function NewProductPage() {
 
     // Append main product images
     formData.delete("images");
-    images.forEach((file) => {
+    const orderedImages = mainImageIndex !== null && images[mainImageIndex]
+      ? [images[mainImageIndex], ...images.filter((_, index) => index !== mainImageIndex)]
+      : images;
+    orderedImages.forEach((file) => {
       formData.append("images", file);
     });
 
@@ -278,7 +296,7 @@ export default function NewProductPage() {
       });
 
       if (res.ok) {
-        router.push("/admin/products");
+        router.push(`/${locale}/admin/products`);
         router.refresh();
       } else {
         const errData = await res.json();
@@ -299,7 +317,7 @@ export default function NewProductPage() {
         <p className="text-muted-foreground text-sm">Add a new item with dynamic variant matrices and localized assets</p>
       </div>
 
-      <form onSubmit={onSubmit} className="grid gap-8 bg-card p-8 rounded-xl border border-border shadow-sm w-full">
+      <form onSubmit={onSubmit} className="grid w-full gap-8 border border-border bg-card p-8 shadow-sm">
         {/* Core Product Information */}
         <div className="space-y-6">
           <h2 className="text-sm font-semibold uppercase tracking-widest border-b pb-2">Product Info</h2>
@@ -334,6 +352,8 @@ export default function NewProductPage() {
             </div>
           </div>
         </div>
+
+        <CategoryPicker selectedIds={categoryIds} onChange={setCategoryIds} />
 
         {/* Descriptions */}
         <div className="space-y-6">
@@ -580,8 +600,11 @@ export default function NewProductPage() {
 
         {/* Images Upload */}
         <div className="grid gap-2 pt-4 border-t border-border">
-          <Label className="text-xs uppercase tracking-widest font-semibold">Main Product Images Gallery</Label>
-          <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:bg-accent/30 transition-colors cursor-pointer relative">
+          <div>
+            <Label className="text-xs uppercase tracking-widest font-semibold">Main Product Images Gallery</Label>
+            <p className="mt-1 text-[10px] text-muted-foreground">Choose one main image. It appears first in product listings and on the product page.</p>
+          </div>
+          <div className="relative cursor-pointer border-2 border-dashed border-border p-6 text-center transition-colors hover:bg-accent/30">
             <input
               type="file"
               id="images"
@@ -599,8 +622,10 @@ export default function NewProductPage() {
           {/* Image Previews */}
           {imagePreviews.length > 0 && (
             <div className="grid grid-cols-4 sm:grid-cols-6 gap-4 mt-4">
-              {imagePreviews.map((preview, index) => (
-                <div key={index} className="relative group border border-border rounded-lg overflow-hidden aspect-square bg-muted">
+              {imagePreviews.map((preview, index) => {
+                const isMainImage = mainImageIndex === index;
+                return (
+                <div key={preview} className={`relative group overflow-hidden border aspect-square bg-muted ${isMainImage ? "border-2 border-primary" : "border-border"}`}>
                   <img
                     src={preview}
                     alt={`Preview ${index + 1}`}
@@ -609,12 +634,22 @@ export default function NewProductPage() {
                   <button
                     type="button"
                     onClick={() => removeImage(index)}
-                    className="absolute top-1 right-1 bg-destructive text-destructive-foreground p-1 rounded-full text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute right-1 top-1 bg-destructive p-1 text-xs text-destructive-foreground opacity-0 transition-opacity group-hover:opacity-100"
                   >
                     ✕
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setMainImageIndex(index)}
+                    className={`absolute bottom-1 left-1 flex h-7 items-center gap-1 border px-2 text-[9px] font-bold uppercase tracking-wider transition-colors ${isMainImage ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background/95 text-foreground sm:opacity-0 sm:group-hover:opacity-100"}`}
+                    aria-label={isMainImage ? "Main product image" : `Set image ${index + 1} as main`}
+                  >
+                    <Star className="h-3 w-3" fill={isMainImage ? "currentColor" : "none"} />
+                    {isMainImage ? "Main" : "Set main"}
+                  </button>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

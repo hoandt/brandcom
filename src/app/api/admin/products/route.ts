@@ -1,9 +1,61 @@
+import { auth } from "@/auth";
+import { isAdminEmail } from "@/lib/admin-access";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { uploadFileToR2 } from "@/lib/r2";
 import { slugify } from "@/lib/slugify";
+import { revalidateTag } from "next/cache";
+
+async function authorized() {
+  const session = await auth();
+  return isAdminEmail(session?.user?.email);
+}
+
+function parseCategoryIds(value: FormDataEntryValue | null) {
+  if (typeof value !== "string") return [];
+  const parsed = JSON.parse(value);
+  if (!Array.isArray(parsed) || parsed.some((id) => typeof id !== "string")) throw new Error("Invalid category data");
+  return [...new Set(parsed)];
+}
+
+type SubmittedInventory = { warehouseId?: string; quantity?: number };
+type SubmittedVariant = {
+  name?: string;
+  sku: string;
+  price: number;
+  stock?: number;
+  inventories?: SubmittedInventory[];
+  imageUrl?: string | null;
+};
+
+export async function GET() {
+  if (!(await authorized())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const products = await prisma.product.findMany({
+    include: {
+      categories: { select: { id: true, name: true, slug: true, parentId: true } },
+      images: { orderBy: { position: "asc" }, take: 1 },
+      variants: {
+        orderBy: { name: "asc" },
+        select: {
+          id: true,
+          name: true,
+          sku: true,
+          stock: true,
+          inventories: {
+            where: { quantity: { gt: 0 } },
+            orderBy: { warehouse: { name: "asc" } },
+            include: { warehouse: { select: { id: true, name: true, code: true, isDefault: true, isActive: true } } },
+          },
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+  return NextResponse.json({ products });
+}
 
 export async function POST(req: Request) {
+  if (!(await authorized())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const formData = await req.formData();
     const name = formData.get("name") as string;
@@ -13,20 +65,28 @@ export async function POST(req: Request) {
     const materials = (formData.get("materials") as string) || "";
     const care = (formData.get("care") as string) || "";
     const variantsStr = formData.get("variants") as string;
+    const categoryIds = parseCategoryIds(formData.get("categoryIds"));
 
     if (!name || !variantsStr) {
       return NextResponse.json({ error: "Missing name or variants data" }, { status: 400 });
     }
 
-    let variants = [];
+    let variants: SubmittedVariant[] = [];
     try {
-      variants = JSON.parse(variantsStr);
-    } catch (e) {
+      variants = JSON.parse(variantsStr) as SubmittedVariant[];
+    } catch {
       return NextResponse.json({ error: "Invalid variants JSON" }, { status: 400 });
     }
 
     if (variants.length === 0) {
       return NextResponse.json({ error: "At least one variant is required" }, { status: 400 });
+    }
+
+    if (categoryIds.length > 0) {
+      const categoryCount = await prisma.category.count({ where: { id: { in: categoryIds }, isActive: true } });
+      if (categoryCount !== categoryIds.length) {
+        return NextResponse.json({ error: "One or more categories are invalid" }, { status: 400 });
+      }
     }
 
     // Auto-slugify name if slug is not provided
@@ -84,6 +144,7 @@ export async function POST(req: Request) {
         materials,
         care,
         status: "ACTIVE",
+        categories: categoryIds.length > 0 ? { connect: categoryIds.map((id) => ({ id })) } : undefined,
         images: {
           create: imageUrls.map((url, idx) => ({
             url,
@@ -92,7 +153,7 @@ export async function POST(req: Request) {
           })),
         },
         variants: {
-          create: variants.map((v: any) => {
+          create: variants.map((v) => {
             const submittedInventories = Array.isArray(v.inventories)
               ? v.inventories
                   .map((inventory: { warehouseId?: string; quantity?: number }) => ({ warehouseId: inventory.warehouseId || "", quantity: Math.max(0, Math.floor(Number(inventory.quantity) || 0)) }))
@@ -121,6 +182,7 @@ export async function POST(req: Request) {
       },
     });
 
+    revalidateTag("products");
     return NextResponse.json(product);
   } catch (error) {
     console.error("[CREATE_PRODUCT_API_ERROR]", error);

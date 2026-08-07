@@ -166,6 +166,7 @@ export const checkSPXShippingFee = async (
       'random-num': randomInt.toString(),
     },
     body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(8_000),
   });
 
   if (!response.ok) {

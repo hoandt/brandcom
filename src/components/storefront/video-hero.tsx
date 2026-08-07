@@ -39,7 +39,7 @@ export function VideoHero({ desktopVideoUrl, mobileVideoUrl, locale }: VideoHero
       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
 
       {/* Content - Positioned Bottom Left like Uniqlo */}
-      <div className="absolute inset-0 flex items-end container mx-auto px-4 md:px-8 pb-16 md:pb-24">
+      <div className="storefront-container absolute inset-0 flex items-end pb-16 md:pb-24">
         <div className="relative z-10 max-w-2xl text-left">
           <div className="inline-block mb-4 px-3 py-1 bg-black/80 backdrop-blur-md text-white text-[10px] font-bold tracking-[0.2em] uppercase rounded-full">
             Trending
@@ -63,7 +63,7 @@ export function VideoHero({ desktopVideoUrl, mobileVideoUrl, locale }: VideoHero
             <Button
               variant="outline"
               className="px-8 border-white text-white hover:bg-white hover:text-primary shadow-lg rounded-full bg-transparent"
-              render={<Link href={`/${locale}/about`} />}
+              render={<Link href={`/${locale}/pages/about-us`} />}
             >
               {t("learnMore")}
             </Button>

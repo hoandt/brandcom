@@ -1,11 +1,11 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import Image from "next/image";
 import { ProductClient } from "./product-client";
 import { unstable_cache } from "next/cache";
 import type { Metadata } from "next";
 import { marked } from "marked";
-import { formatPrice } from "@/lib/utils";
+import { getCategoryPath } from "@/lib/categories";
+import { getTranslations } from "next-intl/server";
 
 type Props = {
   params: Promise<{ locale: string; slug: string }>;
@@ -23,6 +23,7 @@ const getProduct = unstable_cache(
         variants: {
           where: { isActive: true },
         },
+        categories: { select: { id: true } },
       },
     });
   },
@@ -58,6 +59,24 @@ export default async function ProductPage({ params }: Props) {
   if (!product) {
     notFound();
   }
+
+  const [allCategories, tProduct, tNavbar] = await Promise.all([
+    prisma.category.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true, slug: true, parentId: true },
+    }),
+    getTranslations("Product"),
+    getTranslations("Navbar"),
+  ]);
+  const categoryPath = product.categories
+    .map((category) => getCategoryPath(allCategories, category.id))
+    .sort((a, b) => b.length - a.length)[0] ?? [];
+  const breadcrumbs = [
+    { label: tProduct("home"), href: `/${locale}` },
+    { label: tNavbar("allProducts"), href: `/${locale}/collections/all` },
+    ...categoryPath.map((category) => ({ label: category.name, href: `/${locale}/categories/${category.slug}` })),
+    { label: product.name },
+  ];
 
   // Compile markdown fields on the server
   const compiledDescription = product.description ? await marked.parse(product.description) : "";
@@ -95,14 +114,25 @@ export default async function ProductPage({ params }: Props) {
       }))
     }
   };
+  const siteUrl = (process.env.FRONTEND_URL || "https://auria.fit").replace(/\/$/, "");
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: breadcrumbs.map((item, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: item.label,
+      item: item.href ? `${siteUrl}${item.href}` : `${siteUrl}/${locale}/products/${slug}`,
+    })),
+  };
 
   return (
-    <div className="min-h-screen selection:bg-primary/20 bg-[#faf9f7] dark:bg-neutral-950">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-10 pt-8 lg:pt-16 max-w-7xl">
+    <div className="min-h-screen bg-background selection:bg-primary/20">
+      <div className="w-full lg:container lg:mx-auto lg:max-w-[1440px] lg:px-8 lg:pt-6">
       {/* Schema.org / JSON-LD for Search Engines & AI Bots */}
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify([jsonLd, breadcrumbJsonLd]) }}
       />
 
       <ProductClient

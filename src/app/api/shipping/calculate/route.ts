@@ -7,7 +7,34 @@ import { getSPXSettings, SPX_CARRIER } from '@/lib/shipping/settings';
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { location, items, recipient } = body;
+    const { location, items, recipient, isCod, codAmount } = body;
+    const locationName = (value: unknown) =>
+      typeof value === 'string'
+        ? value.trim()
+        : (value as { name?: unknown } | null | undefined)?.name &&
+            typeof (value as { name?: unknown }).name === 'string'
+          ? ((value as { name: string }).name).trim()
+          : '';
+    const destination = {
+      province: locationName(location?.province),
+      district: locationName(location?.district),
+      ward: locationName(location?.ward),
+    };
+
+    if (!destination.province || !destination.district || !destination.ward) {
+      return NextResponse.json(
+        { error: 'Incomplete destination address' },
+        { status: 400 }
+      );
+    }
+
+    if (!Array.isArray(items) || items.length === 0 || items.some((item) => !Number.isFinite(item?.quantity) || item.quantity <= 0)) {
+      return NextResponse.json(
+        { error: 'Cart items are invalid' },
+        { status: 400 }
+      );
+    }
+
     const [storeSettings, carrierSettings] = await Promise.all([
       getStoreSettings(),
       getSPXSettings(),
@@ -21,20 +48,6 @@ export async function POST(req: Request) {
           fallbackFee: storeSettings.fallbackShippingFee,
         },
         { status: 503 }
-      );
-    }
-
-    if (!location || !location.province || !location.district || !location.ward) {
-      return NextResponse.json(
-        { error: 'Incomplete destination address' },
-        { status: 400 }
-      );
-    }
-
-    if (!items || !items.length) {
-      return NextResponse.json(
-        { error: 'Cart is empty' },
-        { status: 400 }
       );
     }
 
@@ -62,13 +75,8 @@ export async function POST(req: Request) {
       return name;
     };
 
-    const locationName = (value: unknown) =>
-      typeof value === 'string'
-        ? value
-        : (value as { name?: string } | null | undefined)?.name || '';
-
-    const spxProvince = sanitizeSPXLocation(locationName(location.province));
-    let spxDistrict = sanitizeSPXLocation(locationName(location.district));
+    const spxProvince = sanitizeSPXLocation(destination.province);
+    let spxDistrict = sanitizeSPXLocation(destination.district);
     if (spxDistrict.toLowerCase().includes('thủ đức')) spxDistrict = 'Thành Phố Thủ Đức';
 
     const order: Omit<SPXOrder, 'user_id' | 'user_secret'> = {
@@ -78,8 +86,12 @@ export async function POST(req: Request) {
       },
       fulfillment_info: {
         payment_role: carrierSettings.paymentRole,
-        cod_collection: carrierSettings.codCollection,
-        cod_amount: carrierSettings.defaultCodAmount,
+        ...(isCod ? {
+          cod_collection: carrierSettings.codCollection,
+          cod_amount: codAmount > 0 ? codAmount : carrierSettings.defaultCodAmount,
+        } : {
+          cod_collection: 0,
+        }),
         high_value_processing_collection: carrierSettings.highValueProcessingCollection,
         collect_type: carrierSettings.collectType,
         allow_mutual_check: carrierSettings.allowMutualCheck,
@@ -121,11 +133,11 @@ export async function POST(req: Request) {
         deliver_country: carrierSettings.senderCountry,
         deliver_state: spxProvince,
         deliver_city: spxDistrict,
-        deliver_district: locationName(location.ward) || spxDistrict,
+        deliver_district: destination.ward,
         deliver_detail_address:
           typeof location.detailAddress === 'string' && location.detailAddress.trim()
             ? location.detailAddress.trim()
-            : locationName(location.ward) || spxDistrict,
+            : destination.ward,
         ...(typeof recipient?.name === 'string' && recipient.name.trim()
           ? { deliver_name: recipient.name.trim() }
           : {}),
@@ -186,16 +198,20 @@ export async function POST(req: Request) {
       );
     }
   } catch (error: unknown) {
-    console.error('Shipping calculation error:', error);
-    // Returning fallback fee so checkout is not totally blocked
+    // Provider/network failures use the configured fallback so checkout remains usable.
     const storeSettings = await getStoreSettings().catch(() => null);
+    const fallbackFee = storeSettings?.fallbackShippingFee ?? 30000;
+    const message = error instanceof Error ? error.message : 'Shipping provider unavailable';
+    console.warn(`Shipping calculation unavailable; using fallback fee: ${message}`);
     return NextResponse.json(
       {
-        error: error instanceof Error ? error.message : 'Internal Server Error',
+        fee: fallbackFee,
+        warning: 'Shipping provider unavailable; fallback fee applied',
         carrier: SPX_CARRIER,
-        fallbackFee: storeSettings?.fallbackShippingFee ?? 30000,
+        fallbackFee,
+        isFallback: true,
       },
-      { status: 500 }
+      { status: 200 }
     );
   }
 }

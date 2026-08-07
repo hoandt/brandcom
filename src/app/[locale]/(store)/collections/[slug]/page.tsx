@@ -1,6 +1,7 @@
 import { getTranslations } from "next-intl/server";
 import { CollectionClient } from "./collection-client";
 import { notFound } from "next/navigation";
+import { CollectionCategoryNavigation } from "@/components/storefront/category-navigation";
 
 export default async function CollectionPage({
   params,
@@ -14,30 +15,34 @@ export default async function CollectionPage({
     notFound();
   }
 
-  const t = await getTranslations("Navbar"); // Reusing Navbar translations for title
+  const t = await getTranslations("Navbar");
 
   let title = "";
   let description = "";
 
   if (slug === "new") {
     title = t("newArrivals");
-    description = "The latest additions to our curated collection.";
+    description = t("newCollectionDescription");
   } else if (slug === "all") {
     title = t("allProducts");
-    description = "Explore our complete range of premium essentials.";
+    description = t("allCollectionDescription");
   }
 
   return (
-    <div className="container mx-auto py-12 px-4 md:px-8 min-h-[60vh]">
+    <div className="storefront-container min-h-[60vh] py-12">
       {/* Collection Header */}
-      <div className="mb-12 text-center max-w-2xl mx-auto space-y-4">
-        <h1 className="text-3xl md:text-5xl font-heading uppercase tracking-widest">
-          {title}
+      <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-border/40 pb-6">
+        <h1 className="text-4xl md:text-5xl lg:text-6xl font-heading tracking-tight capitalize">
+          {title}.
         </h1>
-        <p className="text-muted-foreground font-light text-sm md:text-base">
-          {description}
-        </p>
+        {description && (
+          <p className="text-muted-foreground font-light text-sm md:text-base max-w-md">
+            {description}
+          </p>
+        )}
       </div>
+
+      <CollectionCategoryNavigation />
 
       {/* Product Grid (Client Component) */}
       <CollectionClient slug={slug} />

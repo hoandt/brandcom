@@ -77,18 +77,27 @@ model Product {
   images      ProductImage[]
   variants    ProductVariant[]
   categories  Category[]
+  reviews     ProductReview[]
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 }
 
 model Category {
-  id          String    @id @default(cuid())
-  name        String
-  slug        String    @unique
-  description String?
-  products    Product[]
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id           String     @id @default(cuid())
+  name         String
+  slug         String     @unique
+  description  String?
+  heroImageUrl String?
+  parentId     String?
+  parent       Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children     Category[] @relation("CategoryHierarchy")
+  position     Int        @default(0)
+  isActive     Boolean    @default(true)
+  products     Product[]
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([parentId, position])
 }
 
 model ProductImage {
@@ -170,19 +179,58 @@ enum ProductStatus {
 }
 
 model User {
-  id            String    @id @default(cuid())
+  id            String              @id @default(cuid())
   name          String?
-  email         String?   @unique
+  email         String?             @unique
   emailVerified DateTime?
-  phone         String?   @unique
+  phone         String?             @unique
   image         String?
   password      String?
   accounts      Account[]
   sessions      Session[]
   addresses     Address[]
   orders        Order[]
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  reviews       ProductReview[]
+  reviewVotes   ReviewHelpfulVote[]
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+}
+
+model ProductReview {
+  id                 String              @id @default(cuid())
+  productId          String
+  product            Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId             String
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rating             Int
+  title              String
+  body               String
+  isVerifiedPurchase Boolean             @default(false)
+  status             ReviewStatus        @default(PENDING)
+  helpfulVotes       ReviewHelpfulVote[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@unique([productId, userId])
+  @@index([productId, status, createdAt])
+}
+
+model ReviewHelpfulVote {
+  id        String        @id @default(cuid())
+  reviewId  String
+  review    ProductReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime      @default(now())
+
+  @@unique([reviewId, userId])
+  @@index([userId])
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 model PhoneOtpChallenge {

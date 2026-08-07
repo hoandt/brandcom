@@ -6,8 +6,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useRouter } from "next/navigation"
 import { MarkdownEditor } from "@/components/admin/markdown-editor"
-import { Boxes, X, Image as ImageIcon } from "lucide-react"
+import { Boxes, X, Image as ImageIcon, Star } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { CategoryPicker } from "@/components/admin/category-picker"
+import { useLocale } from "next-intl"
+import { useQueryClient } from "@tanstack/react-query"
 
 // Port of slugify utility for client-side use
 function clientSlugify(text: string): string {
@@ -55,6 +58,7 @@ interface EditProductFormProps {
     overview: string
     materials: string
     care: string
+    categoryIds: string[]
     images: string[]
     variants: {
       id: string
@@ -113,6 +117,8 @@ const parseInitialAttributes = (variantsList: { name: string }[]): Attribute[] =
 
 export default function EditProductForm({ initialData }: EditProductFormProps) {
   const router = useRouter()
+  const queryClient = useQueryClient()
+  const locale = useLocale()
   const [loading, setLoading] = useState(false)
 
   const [name, setName] = useState(initialData.name)
@@ -122,10 +128,14 @@ export default function EditProductForm({ initialData }: EditProductFormProps) {
   const [overview, setOverview] = useState(initialData.overview)
   const [materials, setMaterials] = useState(initialData.materials)
   const [care, setCare] = useState(initialData.care)
+  const [categoryIds, setCategoryIds] = useState<string[]>(initialData.categoryIds)
 
   const [existingImages, setExistingImages] = useState<string[]>(initialData.images)
   const [newImages, setNewImages] = useState<File[]>([])
   const [newImagePreviews, setNewImagePreviews] = useState<string[]>([])
+  const [mainImageKey, setMainImageKey] = useState<string | null>(
+    initialData.images[0] ? `existing:${initialData.images[0]}` : null
+  )
 
   // Reconstruct attributes state from database
   const [attributes, setAttributes] = useState<Attribute[]>(
@@ -231,19 +241,41 @@ export default function EditProductForm({ initialData }: EditProductFormProps) {
 
       const previews = selectedFiles.map((file) => URL.createObjectURL(file));
       setNewImagePreviews((prev) => [...prev, ...previews]);
+      if (!mainImageKey && previews[0]) setMainImageKey(`new:${previews[0]}`);
     }
   };
 
   const removeExistingImage = (url: string) => {
-    setExistingImages((prev) => prev.filter((imgUrl) => imgUrl !== url));
+    const remainingExistingImages = existingImages.filter((imgUrl) => imgUrl !== url);
+    setExistingImages(remainingExistingImages);
+    if (mainImageKey === `existing:${url}`) {
+      setMainImageKey(
+        remainingExistingImages[0]
+          ? `existing:${remainingExistingImages[0]}`
+          : newImagePreviews[0]
+            ? `new:${newImagePreviews[0]}`
+            : null
+      );
+    }
   };
 
   const removeNewImage = (index: number) => {
+    const removedPreview = newImagePreviews[index];
+    const remainingPreviews = newImagePreviews.filter((_, i) => i !== index);
     setNewImages((prev) => prev.filter((_, i) => i !== index));
     setNewImagePreviews((prev) => {
       URL.revokeObjectURL(prev[index]);
       return prev.filter((_, i) => i !== index);
     });
+    if (mainImageKey === `new:${removedPreview}`) {
+      setMainImageKey(
+        existingImages[0]
+          ? `existing:${existingImages[0]}`
+          : remainingPreviews[0]
+            ? `new:${remainingPreviews[0]}`
+            : null
+      );
+    }
   };
 
   // Manage Attribute Fields
@@ -347,6 +379,7 @@ export default function EditProductForm({ initialData }: EditProductFormProps) {
     formData.set("overview", overview)
     formData.set("materials", materials)
     formData.set("care", care)
+    formData.set("categoryIds", JSON.stringify(categoryIds))
 
     // Append remaining existing images
     formData.delete("existingImages")
@@ -359,6 +392,18 @@ export default function EditProductForm({ initialData }: EditProductFormProps) {
     newImages.forEach((file) => {
       formData.append("images", file)
     })
+
+    if (mainImageKey?.startsWith("existing:")) {
+      formData.set("mainImageType", "existing")
+      formData.set("mainImageValue", mainImageKey.slice("existing:".length))
+    } else if (mainImageKey?.startsWith("new:")) {
+      const selectedPreview = mainImageKey.slice("new:".length)
+      const selectedNewImageIndex = newImagePreviews.indexOf(selectedPreview)
+      if (selectedNewImageIndex >= 0) {
+        formData.set("mainImageType", "new")
+        formData.set("mainImageValue", selectedNewImageIndex.toString())
+      }
+    }
 
     // Append variants array as JSON string
     formData.append("variants", JSON.stringify(variants.map(v => ({
@@ -385,7 +430,9 @@ export default function EditProductForm({ initialData }: EditProductFormProps) {
       })
 
       if (res.ok) {
-        router.push("/admin/products")
+        queryClient.removeQueries({ queryKey: ["admin-product", initialData.id] })
+        await queryClient.invalidateQueries({ queryKey: ["admin-products"] })
+        router.push(`/${locale}/admin/products`)
         router.refresh()
       } else {
         const errData = await res.json()
@@ -447,6 +494,8 @@ export default function EditProductForm({ initialData }: EditProductFormProps) {
             </div>
           </div>
         </div>
+
+        <CategoryPicker selectedIds={categoryIds} onChange={setCategoryIds} />
 
         {/* Product Story */}
         <div className="space-y-4">
@@ -698,15 +747,20 @@ export default function EditProductForm({ initialData }: EditProductFormProps) {
 
         {/* Main Images Gallery */}
         <div className="grid gap-2 pt-4 border-t border-border">
-          <Label className="text-xs uppercase tracking-widest font-bold">Product Images Gallery</Label>
+          <div>
+            <Label className="text-xs uppercase tracking-widest font-bold">Product Images Gallery</Label>
+            <p className="mt-1 text-[10px] text-muted-foreground">Choose one main image. It appears first in product listings and on the product page.</p>
+          </div>
 
           {/* Existing Images */}
           {existingImages.length > 0 && (
             <div className="mb-3">
               <h3 className="text-[10px] uppercase tracking-widest text-muted-foreground mb-2 font-bold">Active Images</h3>
               <div className="grid grid-cols-4 sm:grid-cols-6 gap-3">
-                {existingImages.map((url, index) => (
-                  <div key={index} className="relative group border border-border rounded-none overflow-hidden aspect-square bg-muted">
+                {existingImages.map((url, index) => {
+                  const isMainImage = mainImageKey === `existing:${url}`;
+                  return (
+                  <div key={url} className={`relative group overflow-hidden border aspect-square bg-muted ${isMainImage ? "border-2 border-primary" : "border-border"}`}>
                     <img
                       src={url}
                       alt={`Product ${index + 1}`}
@@ -719,8 +773,18 @@ export default function EditProductForm({ initialData }: EditProductFormProps) {
                     >
                       ✕
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => setMainImageKey(`existing:${url}`)}
+                      className={`absolute bottom-1 left-1 flex h-7 items-center gap-1 border px-2 text-[9px] font-bold uppercase tracking-wider transition-colors ${isMainImage ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background/95 text-foreground sm:opacity-0 sm:group-hover:opacity-100"}`}
+                      aria-label={isMainImage ? "Main product image" : `Set image ${index + 1} as main`}
+                    >
+                      <Star className="h-3 w-3" fill={isMainImage ? "currentColor" : "none"} />
+                      {isMainImage ? "Main" : "Set main"}
+                    </button>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -745,8 +809,10 @@ export default function EditProductForm({ initialData }: EditProductFormProps) {
             <div className="mt-3">
               <h3 className="text-[10px] uppercase tracking-widest text-muted-foreground mb-2 font-bold">New Images to Upload</h3>
               <div className="grid grid-cols-4 sm:grid-cols-6 gap-3">
-                {newImagePreviews.map((preview, index) => (
-                  <div key={index} className="relative group border border-border rounded-none overflow-hidden aspect-square bg-muted">
+                {newImagePreviews.map((preview, index) => {
+                  const isMainImage = mainImageKey === `new:${preview}`;
+                  return (
+                  <div key={preview} className={`relative group overflow-hidden border aspect-square bg-muted ${isMainImage ? "border-2 border-primary" : "border-border"}`}>
                     <img
                       src={preview}
                       alt={`New Preview ${index + 1}`}
@@ -759,8 +825,18 @@ export default function EditProductForm({ initialData }: EditProductFormProps) {
                     >
                       ✕
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => setMainImageKey(`new:${preview}`)}
+                      className={`absolute bottom-1 left-1 flex h-7 items-center gap-1 border px-2 text-[9px] font-bold uppercase tracking-wider transition-colors ${isMainImage ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background/95 text-foreground sm:opacity-0 sm:group-hover:opacity-100"}`}
+                      aria-label={isMainImage ? "Main product image" : `Set new image ${index + 1} as main`}
+                    >
+                      <Star className="h-3 w-3" fill={isMainImage ? "currentColor" : "none"} />
+                      {isMainImage ? "Main" : "Set main"}
+                    </button>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
