@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ShoppingBag } from "lucide-react";
+import { ChevronRight, ShoppingBag } from "lucide-react";
 import { useCartStore } from "@/stores/cart-store";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState, useRef } from "react";
@@ -48,18 +48,25 @@ export function CartIcon({ isTransparent }: { isTransparent?: boolean }) {
   }
 
   return (
-    <Link href={`/${locale}/checkout`}>
-      <div className={`flex items-center gap-2 h-10 px-3 rounded-full transition-all duration-300 ${
+    <Link
+      href={`/${locale}/checkout`}
+      aria-label={`${itemCount} ${itemCount === 1 ? "item" : "items"}, ${formatPrice(cartTotal, locale)}`}
+      className={`group flex h-10 items-center gap-2 rounded-full px-3 transition-all duration-300 ${
         isTransparent
           ? "bg-white/20 text-white hover:bg-white/30"
-          : "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
-      } ${isBumping ? "scale-110" : "scale-100"}`}>
-        <ShoppingBag className="h-4 w-4" />
-        <div className="flex flex-col items-start leading-none tracking-tight">
-          <span className="text-[10px] opacity-90 font-medium">{itemCount} item{itemCount !== 1 ? 's' : ''}</span>
-          <span className="text-xs font-bold">{formatPrice(cartTotal, locale)}</span>
-        </div>
-      </div>
+          : "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
+      } ${isBumping ? "scale-110" : "scale-100"}`}
+    >
+      <span className="relative flex h-6 w-6 shrink-0 items-center justify-center">
+        <ShoppingBag className="h-[18px] w-[18px]" />
+        <span className={`absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-black leading-none ${isTransparent ? "bg-white text-foreground" : "bg-background text-primary"}`}>
+          {itemCount > 99 ? "99+" : itemCount}
+        </span>
+      </span>
+      <span className="whitespace-nowrap text-xs font-extrabold tracking-tight">
+        {formatPrice(cartTotal, locale)}
+      </span>
+      <ChevronRight className="h-3.5 w-3.5 shrink-0 opacity-75 transition-transform group-hover:translate-x-0.5" />
     </Link>
   );
 }

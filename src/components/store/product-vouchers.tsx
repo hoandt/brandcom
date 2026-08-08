@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslations, useLocale } from "next-intl";
 import { formatPrice } from "@/lib/utils";
-import { Ticket, Truck, Tag, Clock, ArrowRight } from "lucide-react";
+import { Ticket, Truck, Tag, Clock, ChevronRight } from "lucide-react";
 import type { VoucherBenefit } from "@/lib/voucher/calculator";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -83,8 +83,6 @@ export function ProductVouchers({ productId }: { productId: string }) {
   if (vouchers.length === 0) return null;
 
   const displayVouchers = vouchers.slice(0, 3);
-  const hasMore = vouchers.length > 3;
-
   const renderVoucher = (voucher: ActiveVoucher, isCompact = false) => {
     const isCopied = copiedCode === voucher.code;
     const benefitText = formatBenefit(voucher.benefit, locale);
@@ -106,7 +104,16 @@ export function ProductVouchers({ productId }: { productId: string }) {
     return (
       <div
         key={voucher.id}
-        className={`group relative flex ${isCompact ? 'w-full' : 'w-[280px]'} shrink-0 snap-start items-stretch overflow-hidden rounded-md border border-border/90 bg-card shadow-[0_1px_2px_rgba(39,31,29,0.06),0_5px_14px_rgba(39,31,29,0.06)] transition-all hover:border-primary/30 hover:shadow-[0_2px_4px_rgba(39,31,29,0.07),0_8px_20px_rgba(39,31,29,0.08)]`}
+        role={isCompact ? undefined : "button"}
+        tabIndex={isCompact ? undefined : 0}
+        onClick={isCompact ? undefined : () => setOpen(true)}
+        onKeyDown={isCompact ? undefined : (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            setOpen(true);
+          }
+        }}
+        className={`group relative flex ${isCompact ? 'w-full' : 'w-[280px] cursor-pointer'} shrink-0 snap-start items-stretch overflow-hidden rounded-md border border-border/90 bg-card shadow-[0_1px_2px_rgba(39,31,29,0.06),0_5px_14px_rgba(39,31,29,0.06)] transition-all hover:border-primary/30 hover:shadow-[0_2px_4px_rgba(39,31,29,0.07),0_8px_20px_rgba(39,31,29,0.08)]`}
       >
         {/* Left Stub */}
         <div className="flex w-[68px] shrink-0 flex-col items-center justify-center border-r border-border/80 bg-primary/[0.045] px-2 py-3 text-center text-primary">
@@ -137,7 +144,10 @@ export function ProductVouchers({ productId }: { productId: string }) {
         <div className="flex shrink-0 items-center justify-center pr-2.5">
           <button
             type="button"
-            onClick={() => handleCopy(voucher.code)}
+            onClick={(event) => {
+              event.stopPropagation();
+              handleCopy(voucher.code);
+            }}
             disabled={isCopied}
             className={`flex h-7 items-center justify-center rounded px-3 text-[10px] font-bold transition-all active:scale-95 ${isCopied
                 ? 'bg-muted text-muted-foreground'
@@ -154,20 +164,20 @@ export function ProductVouchers({ productId }: { productId: string }) {
 
   return (
     <>
-      <div className="w-full">
+      <div className="relative w-full">
         <div className="flex w-full snap-x snap-mandatory items-center gap-3 overflow-x-auto pb-4 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {displayVouchers.map(v => renderVoucher(v))}
-
-          {hasMore && (
-            <button
-              onClick={() => setOpen(true)}
-              className="flex h-20 shrink-0 snap-start items-center justify-center gap-1 rounded-md border border-dashed bg-muted/30 px-6 text-[10px] font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
-            >
-              {t("viewAll")}
-              <ArrowRight className="h-3.5 w-3.5" />
-            </button>
-          )}
         </div>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-label={t("viewAll")}
+          className="absolute inset-y-0 right-0 z-10 flex w-16 items-center justify-end bg-gradient-to-r from-transparent via-background/80 to-background pr-2 text-primary transition-colors hover:text-primary/75"
+        >
+          <span className="flex h-8 w-8 items-center justify-center rounded-full border border-primary/20 bg-background/95 shadow-sm">
+            <ChevronRight className="h-4 w-4" />
+          </span>
+        </button>
       </div>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[min(80dvh,680px)] overflow-hidden rounded-none border bg-card p-0 shadow-2xl ring-0 sm:max-w-[500px] [&_[data-slot=dialog-close]]:rounded-none">

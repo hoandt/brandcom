@@ -84,22 +84,22 @@ export function Navbar({ session }: { session: Session | null }) {
         : "bg-background/70 backdrop-blur-xl border-b border-border/50 shadow-sm"
         }`}
     >
-      <div className={`storefront-container flex h-20 items-center justify-between transition-colors duration-300 ${isTransparent ? "text-white" : "text-foreground"}`}>
+      <div className={`storefront-container flex h-16 min-w-0 items-center justify-between gap-2 transition-colors duration-300 lg:h-20 ${isTransparent ? "text-white" : "text-foreground"}`}>
 
         {/* Left Section: Logo & Desktop Links */}
-        <div className="flex items-center gap-10">
-          <Link href={`/${locale}`} className="flex items-center">
-            <Logo className={`h-12 md:h-14 w-auto ${isTransparent ? "text-white" : "text-primary"}`} />
+        <div className="flex min-w-0 shrink items-center gap-6 xl:gap-10">
+          <Link href={`/${locale}`} className="flex shrink-0 items-center">
+            <Logo className={`h-10 w-auto sm:h-11 lg:h-14 ${isTransparent ? "text-white" : "text-primary"}`} />
           </Link>
 
-          <nav className="hidden h-20 items-center gap-8 whitespace-nowrap text-[0.85rem] font-bold uppercase tracking-[0.15em] md:flex">
+          <nav className="hidden h-20 items-center gap-5 whitespace-nowrap text-[0.8rem] font-bold uppercase tracking-[0.12em] lg:flex xl:gap-8">
             <DesktopCategoryMenu transparent={isTransparent} active={isShopActive} />
             <Link href={`/${locale}/pages/about-us`} className={`${isTransparent ? "text-white/90 hover:text-white" : "text-muted-foreground hover:text-foreground"} border-b-2 border-transparent py-3 font-heading text-[0.85rem] font-bold uppercase tracking-[0.15em] outline-none transition-colors hover:border-current focus-visible:outline-none focus-visible:ring-0`}>{t("aboutUs")}</Link>
           </nav>
         </div>
 
         {/* Right Section: Search & Icons */}
-        <div className="flex items-center gap-2 md:gap-4">
+        <div className="flex min-w-0 shrink-0 items-center gap-1 lg:gap-2 xl:gap-4">
 
           {/* Search Pill */}
           <div className={`flex items-center rounded-full transition-all duration-300 overflow-hidden ${isSearchOpen ? "w-[180px] sm:w-[280px] px-4 h-11" : "w-0 px-0 h-11 pointer-events-none"
@@ -129,16 +129,16 @@ export function Navbar({ session }: { session: Session | null }) {
               <DropdownMenu>
                 <DropdownMenuTrigger
                   render={
-                    <button className={`flex items-center gap-1 px-2 py-1 outline-none cursor-pointer rounded-none hover:bg-muted/10 ${isTransparent ? "text-white" : "text-foreground"}`}>
-                      <div className="w-5 h-5 rounded-none bg-primary/10 flex items-center justify-center text-primary font-bold text-[10px] uppercase overflow-hidden shrink-0 border border-primary/20">
+                    <button aria-label={session.user.name || "Account"} className={`flex h-10 items-center gap-1 px-1.5 outline-none cursor-pointer rounded-none hover:bg-muted/10 ${isTransparent ? "text-white" : "text-foreground"}`}>
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden border border-primary/20 bg-primary/10 text-primary">
                         {session.user.image ? (
-                          <Image src={session.user.image} alt={session.user.name || "User"} width={20} height={20} unoptimized className="h-full w-full object-cover" />
+                          <Image src={session.user.image} alt={session.user.name || "User"} width={32} height={32} unoptimized className="h-full w-full object-cover" />
                         ) : (
-                          session.user.name?.charAt(0) || "U"
+                          <User className="h-4 w-4" />
                         )}
                       </div>
-                      <span className="max-w-[100px] truncate text-xs font-medium">{session.user.name}</span>
-                      <ChevronDown className="w-3.5 h-3.5 opacity-60 ml-0.5" />
+                      <span className="hidden max-w-[100px] truncate text-xs font-medium xl:inline">{session.user.name}</span>
+                      <ChevronDown className="hidden h-3.5 w-3.5 opacity-60 xl:block" />
                     </button>
                   }
                 />
@@ -203,7 +203,7 @@ export function Navbar({ session }: { session: Session | null }) {
               aria-expanded={isMobileMenuOpen}
               aria-controls="mobile-catalogue-menu"
               onClick={() => setIsMobileMenuOpen(true)}
-              className="md:hidden"
+              className="lg:hidden"
             >
               <Menu className="h-6 w-6" />
             </Button>
@@ -213,7 +213,7 @@ export function Navbar({ session }: { session: Session | null }) {
                 role="dialog"
                 aria-modal="true"
                 aria-label={t("menu")}
-                className="fixed inset-0 z-[100] flex h-dvh w-screen flex-col overflow-hidden bg-background font-heading text-foreground animate-in fade-in duration-150 md:hidden"
+                className="fixed inset-0 z-[100] flex h-dvh w-screen flex-col overflow-hidden bg-background font-heading text-foreground animate-in fade-in duration-150 lg:hidden"
               >
                 <div className="storefront-container flex h-20 shrink-0 items-center border-b">
                   <Link href={`/${locale}`} onClick={() => setIsMobileMenuOpen(false)}><Logo className="h-11 w-auto text-primary" /></Link>
