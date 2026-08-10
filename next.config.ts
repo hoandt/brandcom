@@ -18,6 +18,14 @@ const nextConfig: NextConfig = {
       {
         protocol: "https",
         hostname: "cdn.dashgo.vn",
+      },
+      {
+        protocol: "https",
+        hostname: "**.susercontent.com",
+      },
+      {
+        protocol: "https",
+        hostname: "cf.shopee.vn",
       }
     ],
   },

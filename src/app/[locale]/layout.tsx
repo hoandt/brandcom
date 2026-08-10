@@ -9,6 +9,8 @@ import { getMessages } from 'next-intl/server';
 import { NextIntlClientProvider } from 'next-intl';
 import Providers from "@/components/providers";
 import NextTopLoader from 'nextjs-toploader';
+import { Suspense } from "react";
+import { MarketingPixels } from "@/components/analytics/marketing-pixels";
 
 const oldStandardTT = Old_Standard_TT({
   weight: ["400", "700"],
@@ -33,6 +35,13 @@ export default async function RootLayout({ children, params }: Props) {
   return (
     <html lang={locale}>
       <body className={`antialiased ${oldStandardTT.variable}`}>
+        <Suspense fallback={null}>
+          <MarketingPixels
+            gaMeasurementId={process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID}
+            metaPixelId={process.env.NEXT_PUBLIC_META_PIXEL_ID}
+            tiktokPixelId={process.env.NEXT_PUBLIC_TIKTOK_PIXEL_ID || "D9BFPIBC77U102660TPG"}
+          />
+        </Suspense>
         <NextTopLoader color="hsl(var(--primary))" showSpinner={false} />
         <NextIntlClientProvider messages={messages}>
           <Providers>

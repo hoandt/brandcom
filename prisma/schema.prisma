@@ -26,6 +26,8 @@ model StoreSettings {
   orderPrefix         String   @default("ORD")
   fallbackShippingFee Int      @default(30000)
   lowStockThreshold   Int      @default(5)
+  marketplaceShopId   String?
+  marketplaceShops    Json     @default("[]")
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 }
@@ -66,20 +68,22 @@ model CarrierSettings {
 }
 
 model Product {
-  id          String           @id @default(cuid())
-  name        String
-  slug        String           @unique
-  description String?
-  overview    String?
-  materials   String?
-  care        String?
-  status      ProductStatus    @default(DRAFT)
-  images      ProductImage[]
-  variants    ProductVariant[]
-  categories  Category[]
-  reviews     ProductReview[]
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  id                String           @id @default(cuid())
+  name              String
+  slug              String           @unique
+  description       String?
+  overview          String?
+  materials         String?
+  care              String?
+  cardHoverVideoUrl String?
+  cardHoverImageUrl String?
+  status            ProductStatus    @default(DRAFT)
+  images            ProductImage[]
+  variants          ProductVariant[]
+  categories        Category[]
+  reviews           ProductReview[]
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 }
 
 model Category {

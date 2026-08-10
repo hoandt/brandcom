@@ -54,10 +54,13 @@ interface EditProductFormProps {
     id: string
     name: string
     slug: string
+    status: "DRAFT" | "ACTIVE" | "ARCHIVED"
     description: string
     overview: string
     materials: string
     care: string
+    cardHoverVideoUrl: string
+    cardHoverImageUrl: string
     categoryIds: string[]
     images: string[]
     variants: {
@@ -123,11 +126,16 @@ export default function EditProductForm({ initialData }: EditProductFormProps) {
 
   const [name, setName] = useState(initialData.name)
   const [slug, setSlug] = useState(initialData.slug)
+  const [status, setStatus] = useState<"DRAFT" | "ACTIVE" | "ARCHIVED">(initialData.status)
   const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(true)
   const [description, setDescription] = useState(initialData.description)
   const [overview, setOverview] = useState(initialData.overview)
   const [materials, setMaterials] = useState(initialData.materials)
   const [care, setCare] = useState(initialData.care)
+  const [cardHoverVideoUrl, setCardHoverVideoUrl] = useState(initialData.cardHoverVideoUrl)
+  const [cardHoverVideoFile, setCardHoverVideoFile] = useState<File | null>(null)
+  const [cardHoverVideoPreview, setCardHoverVideoPreview] = useState("")
+  const [cardHoverImageUrl, setCardHoverImageUrl] = useState(initialData.cardHoverImageUrl)
   const [categoryIds, setCategoryIds] = useState<string[]>(initialData.categoryIds)
 
   const [existingImages, setExistingImages] = useState<string[]>(initialData.images)
@@ -375,10 +383,14 @@ export default function EditProductForm({ initialData }: EditProductFormProps) {
 
     const formData = new FormData(e.currentTarget)
     formData.set("slug", slug)
+    formData.set("status", status)
     formData.set("description", description)
     formData.set("overview", overview)
     formData.set("materials", materials)
     formData.set("care", care)
+    formData.set("cardHoverVideoUrl", cardHoverVideoUrl)
+    formData.set("cardHoverImageUrl", cardHoverImageUrl)
+    if (cardHoverVideoFile) formData.set("cardHoverVideo", cardHoverVideoFile)
     formData.set("categoryIds", JSON.stringify(categoryIds))
 
     // Append remaining existing images
@@ -492,6 +504,35 @@ export default function EditProductForm({ initialData }: EditProductFormProps) {
                 }}
               />
             </div>
+          </div>
+
+          <div className="grid gap-2 border border-border bg-secondary/15 p-4 sm:grid-cols-[minmax(0,1fr)_220px] sm:items-center">
+            <div>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="status" className="text-xs font-bold uppercase tracking-widest">Publication status</Label>
+                <span className={`px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${status === "ACTIVE" ? "bg-emerald-100 text-emerald-800" : status === "DRAFT" ? "bg-amber-100 text-amber-800" : "bg-muted text-muted-foreground"}`}>
+                  {status}
+                </span>
+              </div>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                {status === "ACTIVE"
+                  ? "Published and visible on the storefront."
+                  : status === "DRAFT"
+                    ? "Saved privately. Change to Active to publish this product."
+                    : "Hidden from the storefront and retained for records."}
+              </p>
+            </div>
+            <select
+              id="status"
+              name="status"
+              value={status}
+              onChange={(event) => setStatus(event.target.value as "DRAFT" | "ACTIVE" | "ARCHIVED")}
+              className="h-10 w-full border border-input bg-background px-3 text-xs font-bold uppercase tracking-wider outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
+            >
+              <option value="DRAFT">Draft</option>
+              <option value="ACTIVE">Active — Published</option>
+              <option value="ARCHIVED">Archived</option>
+            </select>
           </div>
         </div>
 
@@ -742,6 +783,25 @@ export default function EditProductForm({ initialData }: EditProductFormProps) {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+
+        <div className="grid gap-4 border-t border-border pt-4">
+          <div><Label className="text-xs font-bold uppercase tracking-widest">Card hover experience</Label><p className="mt-1 text-[10px] text-muted-foreground">Video plays muted while hovering a product card. The secondary image is used when no video is available.</p></div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="grid gap-2 border p-3">
+              <Label htmlFor="cardHoverVideoUrl" className="text-[10px] font-bold uppercase tracking-wider">Hover video</Label>
+              <Input id="cardHoverVideoUrl" type="url" value={cardHoverVideoUrl} onChange={(event) => { setCardHoverVideoUrl(event.target.value); setCardHoverVideoFile(null); setCardHoverVideoPreview(""); }} placeholder="https://…/product-hover.mp4" className="h-10 rounded-none text-xs" />
+              <div className="relative flex h-10 items-center justify-center border border-dashed text-[10px] text-muted-foreground"><input type="file" accept="video/mp4,video/webm" className="absolute inset-0 cursor-pointer opacity-0" onChange={(event) => { const file = event.target.files?.[0] ?? null; setCardHoverVideoFile(file); if (cardHoverVideoPreview) URL.revokeObjectURL(cardHoverVideoPreview); setCardHoverVideoPreview(file ? URL.createObjectURL(file) : ""); }} />{cardHoverVideoFile ? cardHoverVideoFile.name : "Or upload MP4/WebM · max 25 MB"}</div>
+              {(cardHoverVideoPreview || cardHoverVideoUrl) && <video src={cardHoverVideoPreview || cardHoverVideoUrl} muted loop playsInline controls className="aspect-video w-full border bg-black object-cover" />}
+              {(cardHoverVideoPreview || cardHoverVideoUrl) && <Button type="button" variant="outline" className="h-8 rounded-none text-[10px]" onClick={() => { if (cardHoverVideoPreview) URL.revokeObjectURL(cardHoverVideoPreview); setCardHoverVideoPreview(""); setCardHoverVideoFile(null); setCardHoverVideoUrl(""); }}>Remove video</Button>}
+            </div>
+            <div className="grid content-start gap-2 border p-3">
+              <Label htmlFor="cardHoverImageUrl" className="text-[10px] font-bold uppercase tracking-wider">Fallback secondary image</Label>
+              <select id="cardHoverImageUrl" value={cardHoverImageUrl} onChange={(event) => setCardHoverImageUrl(event.target.value)} className="h-10 rounded-none border bg-background px-3 text-xs"><option value="">Automatic · second gallery image</option>{existingImages.map((url, index) => <option key={url} value={url}>Gallery image {index + 1}</option>)}</select>
+              {cardHoverImageUrl && <img src={cardHoverImageUrl} alt="Card hover fallback preview" className="aspect-[4/5] max-h-64 w-full border bg-muted object-cover" />}
+              <p className="text-[9px] text-muted-foreground">Used only when the hover video is empty or cannot be played.</p>
+            </div>
           </div>
         </div>
 

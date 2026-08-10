@@ -1,23 +1,26 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import Image from "next/image";
-import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
+import { ProductCard } from "@/components/storefront/product-card";
 
 type Product = {
   id: string;
   name: string;
   slug: string;
-  variants: { price: string }[];
+  variants: { price: string; comparePrice?: string | null; stock: number }[];
   images: { url: string }[];
+  categories: { name: string }[];
+  reviews: { rating: number }[];
+  cardHoverVideoUrl?: string | null;
+  cardHoverImageUrl?: string | null;
 };
 
 export function CollectionClient({ slug }: { slug: string }) {
   const locale = useLocale();
   const t = useTranslations("Homepage"); // using Homepage for some shared labels like viewAll
 
-  const { data, isLoading, isError } = useQuery<{ success: boolean; data: Product[] }>({
+  const { data, isLoading, isError } = useQuery<{ success: boolean; data: Product[]; currency?: string }>({
     queryKey: ["collection", slug],
     queryFn: async () => {
       const res = await fetch(`/api/collections/${slug}`);
@@ -68,51 +71,15 @@ export function CollectionClient({ slug }: { slug: string }) {
         {products.length} styles
       </div>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-10 md:gap-x-6 md:gap-y-12">
-        {products.map((product) => {
-          const mainImage = product.images[0]?.url;
-          return (
-            <Link
-              key={product.id}
-              href={`/${locale}/products/${product.slug}`}
-              className="group flex flex-col gap-3"
-            >
-              <div className="aspect-[4/5] bg-secondary overflow-hidden relative rounded-sm">
-                <div className="absolute top-2 left-2 z-10 bg-background/90 backdrop-blur-sm px-2 py-1 text-[10px] font-bold tracking-wider rounded-sm text-foreground">
-                  SALE
-                </div>
-                {mainImage ? (
-                  <Image
-                    src={mainImage}
-                    alt={product.name}
-                    fill
-                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-                    className="object-cover transition-transform duration-700 group-hover:scale-105"
-                  />
-                ) : (
-                  <div className="absolute inset-0 bg-secondary flex items-center justify-center transition-transform duration-700 group-hover:scale-105">
-                    <span className="text-muted-foreground font-heading uppercase tracking-widest text-xs">
-                      {t("imagePlaceholder")}
-                    </span>
-                  </div>
-                )}
-              </div>
-              <div className="flex flex-col text-left">
-                <h3 className="font-medium text-sm md:text-base leading-tight group-hover:text-primary transition-colors line-clamp-2">
-                  {product.name}
-                </h3>
-                <div className="flex items-center gap-1 mt-1.5">
-                  <div className="flex text-primary text-[10px]">
-                    ★★★★★
-                  </div>
-                  <span className="text-muted-foreground text-xs font-light">4.5 (41)</span>
-                </div>
-                <p className="text-foreground mt-2 font-medium text-sm">
-                  ${product.variants[0]?.price?.toString() || "0.00"}
-                </p>
-              </div>
-            </Link>
-          );
-        })}
+        {products.map((product) => (
+          <ProductCard
+            key={product.id}
+            product={product}
+            locale={locale}
+            currency={data?.currency}
+            imagePlaceholder={t("imagePlaceholder")}
+          />
+        ))}
       </div>
     </>
   );

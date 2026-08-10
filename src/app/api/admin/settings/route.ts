@@ -17,6 +17,15 @@ const schema = z.object({
   orderPrefix: z.string().trim().min(1).max(12).regex(/^[A-Za-z0-9_-]+$/).transform((value) => value.toUpperCase()),
   fallbackShippingFee: z.number().int().min(0),
   lowStockThreshold: z.number().int().min(0),
+  marketplaceShopId: z.union([
+    z.string().trim().regex(/^\d+$/, "Marketplace Shop ID must contain digits only").max(30),
+    z.literal(""),
+    z.null(),
+  ]).optional().transform((value) => value || null),
+  marketplaceShops: z.array(z.object({
+    marketplace: z.enum(["shopee", "lazada", "tiktok_shop"]),
+    shopId: z.string().trim().min(1, "Shop ID is required").max(64),
+  })).max(20).default([]),
 });
 
 async function authorize() {
@@ -34,10 +43,12 @@ export async function PUT(request: Request) {
   if (!(await authorize())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const data = schema.parse(await request.json());
+    const marketplaceShopId = data.marketplaceShops.find((shop) => shop.marketplace === "shopee")?.shopId
+      ?? data.marketplaceShopId;
     const settings = await prisma.storeSettings.upsert({
       where: { tenantId: DEFAULT_TENANT_ID },
-      update: data,
-      create: { ...data, tenantId: DEFAULT_TENANT_ID },
+      update: { ...data, marketplaceShopId },
+      create: { ...data, marketplaceShopId, tenantId: DEFAULT_TENANT_ID },
     });
     return NextResponse.json({ settings });
   } catch (error) {

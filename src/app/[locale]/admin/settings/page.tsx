@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Building2, Globe2, Loader2, PackageCheck, Save, Truck } from "lucide-react";
+import { Building2, Globe2, Loader2, PackageCheck, Plus, Save, Store, Trash2, Truck } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,13 +13,14 @@ type Settings = {
   tenantId: string; storeName: string; legalName: string | null; tagline: string | null;
   supportEmail: string | null; supportPhone: string | null; defaultLocale: "vi" | "en" | "th";
   currency: string; timezone: string; orderPrefix: string; fallbackShippingFee: number;
-  lowStockThreshold: number;
+  lowStockThreshold: number; marketplaceShopId: string | null;
+  marketplaceShops: { marketplace: "shopee" | "lazada" | "tiktok_shop"; shopId: string }[];
 };
 
 const emptySettings: Settings = {
   tenantId: "", storeName: "", legalName: "", tagline: "", supportEmail: "", supportPhone: "",
   defaultLocale: "vi", currency: "VND", timezone: "Asia/Ho_Chi_Minh", orderPrefix: "ORD",
-  fallbackShippingFee: 30000, lowStockThreshold: 5,
+  fallbackShippingFee: 30000, lowStockThreshold: 5, marketplaceShopId: null, marketplaceShops: [],
 };
 
 export default function AdminSettingsPage() {
@@ -40,7 +41,15 @@ export default function AdminSettingsPage() {
   });
 
   useEffect(() => {
-    if (query.data?.settings) setForm(query.data.settings);
+    if (query.data?.settings) {
+      const settings = query.data.settings;
+      const marketplaceShops = settings.marketplaceShops?.length
+        ? settings.marketplaceShops
+        : settings.marketplaceShopId
+          ? [{ marketplace: "shopee" as const, shopId: settings.marketplaceShopId }]
+          : [];
+      setForm({ ...settings, marketplaceShops });
+    }
   }, [query.data]);
 
   const save = useMutation({
@@ -97,6 +106,23 @@ export default function AdminSettingsPage() {
       <SettingsSection icon={PackageCheck} title="Orders and inventory" description="Operational defaults used by order numbering and inventory alerts.">
         <Field label="Order prefix"><Input required value={form.orderPrefix} onChange={(event) => setForm({ ...form, orderPrefix: event.target.value.toUpperCase() })} /></Field>
         <Field label="Low-stock threshold"><Input type="number" min="0" value={form.lowStockThreshold} onChange={(event) => setForm({ ...form, lowStockThreshold: Number(event.target.value) })} /></Field>
+      </SettingsSection>
+
+      <SettingsSection icon={Store} title="Marketplace" description="Connection identifiers used by marketplace migration and synchronization tools.">
+        <div className="grid gap-3 md:col-span-2">
+          {form.marketplaceShops.length === 0 && <div className="border border-dashed p-5 text-center text-xs text-muted-foreground">No marketplace shops connected yet.</div>}
+          {form.marketplaceShops.map((shop, index) => (
+            <div key={`${shop.marketplace}-${index}`} className="grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)_44px] gap-2">
+              <Select value={shop.marketplace} onChange={(marketplace) => setForm({ ...form, marketplaceShops: form.marketplaceShops.map((item, itemIndex) => itemIndex === index ? { ...item, marketplace: marketplace as Settings["marketplaceShops"][number]["marketplace"] } : item) })}>
+                <option value="shopee">Shopee</option><option value="lazada">Lazada</option><option value="tiktok_shop">TikTok Shop</option>
+              </Select>
+              <Input required aria-label={`${shop.marketplace} Shop ID`} value={shop.shopId} onChange={(event) => setForm({ ...form, marketplaceShops: form.marketplaceShops.map((item, itemIndex) => itemIndex === index ? { ...item, shopId: event.target.value } : item) })} placeholder="Shop ID" />
+              <Button type="button" variant="outline" aria-label="Remove marketplace shop" className="h-12 rounded-none px-0 text-muted-foreground hover:text-destructive" onClick={() => setForm({ ...form, marketplaceShops: form.marketplaceShops.filter((_, itemIndex) => itemIndex !== index) })}><Trash2 className="h-4 w-4" /></Button>
+            </div>
+          ))}
+          <div><Button type="button" variant="outline" className="h-10 rounded-none text-xs" onClick={() => setForm({ ...form, marketplaceShops: [...form.marketplaceShops, { marketplace: "shopee", shopId: "" }] })}><Plus className="mr-2 h-4 w-4" />Add marketplace shop</Button></div>
+          <span className="text-[10px] text-muted-foreground">The first Shopee entry is used as the default in product migration.</span>
+        </div>
       </SettingsSection>
 
       <SettingsSection icon={Truck} title="Shipping" description="Safe operational defaults. Carrier credentials remain environment secrets.">

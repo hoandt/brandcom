@@ -10,3 +10,8 @@
 - Do not block navigation by querying application data directly in Server Components.
 - Exception: SEO-sensitive public storefront pages may load data in Server Components for metadata, indexing, and initial HTML. Client-side interactions on those pages may still use TanStack Query.
 - Server Components may still perform authorization, redirects, metadata generation, and other server-only work, but interactive application data should be fetched by the client.
+
+## Orders OpenAPI
+
+- Before changing `/api/openapi`, server-to-server order or product imports, API credential handling, or imported inventory behavior, read `.agents/openapi-orders-agent.md` and `docs/openapi-orders.md` completely.
+- Preserve the authentication, idempotency, transaction, inventory, error-contract, and documentation invariants recorded in that agent brief.

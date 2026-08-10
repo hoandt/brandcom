@@ -45,6 +45,41 @@ npx prisma db push
 npx prisma generate
 ```
 
+## Server-to-server OpenAPI
+
+Full integration documentation: [`docs/openapi-orders.md`](docs/openapi-orders.md). A reusable maintenance brief is available at [`.agents/openapi-orders-agent.md`](.agents/openapi-orders-agent.md).
+
+Configure two server-only credentials. Do not prefix these variables with `NEXT_PUBLIC_`:
+
+```env
+OPENAPI_APP_KEY=replace-with-an-app-key
+OPENAPI_SECRET_KEY=replace-with-a-long-random-secret
+```
+
+Interactive Swagger documentation is available at `GET /api/openapi/docs`, and the OpenAPI 3.1 JSON document is available at `GET /api/openapi`. The API supports `POST /api/openapi/orders` and `POST /api/openapi/products`. Create an order with:
+
+```bash
+curl -X POST http://localhost:3000/api/openapi/orders \
+  -H 'Content-Type: application/json' \
+  -H 'X-App-Key: replace-with-an-app-key' \
+  -H 'X-Secret-Key: replace-with-a-long-random-secret' \
+  -d '{
+    "orderNumber": "EXTERNAL-10001",
+    "customer": {
+      "name": "Nguyen Van A",
+      "phone": "0900000000",
+      "email": "customer@example.com",
+      "address": "Ho Chi Minh City"
+    },
+    "paymentMethod": "COD",
+    "shippingFee": 30000,
+    "discount": 0,
+    "items": [{ "sku": "YOUR-SKU", "quantity": 1 }]
+  }'
+```
+
+Orders are priced from the current variant price unless `unitPrice` is supplied. Inventory allocation and order creation run in one serializable transaction. Reusing an `orderNumber` returns HTTP `409` instead of creating a duplicate.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.

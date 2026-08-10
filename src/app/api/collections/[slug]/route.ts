@@ -8,33 +8,22 @@ export async function GET(
   try {
     const { slug } = await params;
     
-    // Removed artificial delay for faster loading
-    // Base query options
-    const queryOptions: any = {
-      where: {
-        status: "ACTIVE"
-      },
-      include: {
-        variants: {
-          where: { isActive: true }
+    const [products, storeSettings] = await Promise.all([
+      prisma.product.findMany({
+        where: { status: "ACTIVE" },
+        include: {
+          variants: { where: { isActive: true }, orderBy: { price: "asc" } },
+          images: { orderBy: { position: "asc" }, take: 2 },
+          categories: { where: { isActive: true }, orderBy: [{ position: "asc" }, { name: "asc" }], take: 1 },
+          reviews: { where: { status: "APPROVED" }, select: { rating: true } },
         },
-        images: {
-          orderBy: { position: "asc" },
-          take: 1,
-        },
-      }
-    };
+        orderBy: { createdAt: "desc" },
+        ...(slug === "new" ? { take: 24 } : {}),
+      }),
+      prisma.storeSettings.findFirst({ select: { currency: true } }),
+    ]);
 
-    if (slug === "new") {
-      queryOptions.orderBy = { createdAt: "desc" };
-      queryOptions.take = 24; // Limit to 24 new arrivals
-    } else {
-       // "all" or generic
-       queryOptions.orderBy = { createdAt: "desc" };
-    }
-
-    const products = await prisma.product.findMany(queryOptions);
-    return NextResponse.json({ success: true, data: products });
+    return NextResponse.json({ success: true, data: products, currency: storeSettings?.currency });
     
   } catch (error) {
     console.error("[COLLECTIONS_API_ERROR]", error);

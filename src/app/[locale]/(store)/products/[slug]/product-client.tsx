@@ -99,6 +99,7 @@ export function ProductClient({ product, details }: ProductClientProps) {
   }
 
   const selectedVariant = product.variants.find((v) => v.id === selectedVariantId);
+  const isSelectedVariantOnSale = Boolean(selectedVariant?.comparePrice && selectedVariant.comparePrice > selectedVariant.price);
   const selectedStock = selectedVariant?.stock ?? 0;
   const isOutOfStock = selectedStock <= 0;
   const normalizedTitleLength = product.name.trim().length;
@@ -210,7 +211,7 @@ export function ProductClient({ product, details }: ProductClientProps) {
               )}
 
               {/* Badge */}
-              {selectedVariant?.comparePrice && (
+              {isSelectedVariantOnSale && (
                 <div className="absolute left-3 top-3 bg-foreground px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-background">
                   Sale
                 </div>
@@ -237,7 +238,7 @@ export function ProductClient({ product, details }: ProductClientProps) {
             {displayImages.length > 0 ? (
               displayImages.slice(0, 6).map((img, idx) => (
                 <div key={idx} className="relative aspect-[3/4] w-full overflow-hidden bg-muted/40">
-                  {selectedVariant?.comparePrice && idx === 0 && (
+                  {isSelectedVariantOnSale && idx === 0 && (
                     <div className="absolute left-2 top-2 z-10 bg-foreground px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-background">
                       Sale
                     </div>
@@ -399,7 +400,7 @@ export function ProductClient({ product, details }: ProductClientProps) {
                     <span className="whitespace-nowrap text-[clamp(1.75rem,3vw,2rem)] font-black tracking-tight text-primary">
                       {formatPrice(selectedVariant.price, locale, currency)}
                     </span>
-                    {selectedVariant.comparePrice && (
+                    {isSelectedVariantOnSale && selectedVariant.comparePrice && (
                       <span className="text-xs line-through text-muted-foreground font-light">
                         {formatPrice(selectedVariant.comparePrice, locale, currency)}
                       </span>
@@ -514,7 +515,7 @@ export function ProductClient({ product, details }: ProductClientProps) {
             <span className="block whitespace-nowrap text-xl font-black leading-tight tracking-tight text-foreground">
               {selectedVariant ? formatPrice(selectedVariant.price, locale, currency) : ""}
             </span>
-            {selectedVariant?.comparePrice && (
+            {isSelectedVariantOnSale && selectedVariant?.comparePrice && (
               <span className="block text-[12px] leading-none text-muted-foreground line-through">
                 {formatPrice(selectedVariant.comparePrice, locale, currency)}
               </span>

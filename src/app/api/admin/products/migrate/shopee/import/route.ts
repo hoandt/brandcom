@@ -57,7 +57,7 @@ export async function POST(request: Request) {
         name: mappedText(row, mappings.variantName) || (source.rows.length === 1 ? "Default" : `Model ${sourceModelId}`),
         sku,
         price,
-        comparePrice: comparePriceValue >= 0 ? comparePriceValue : null,
+        comparePrice: comparePriceValue > price ? comparePriceValue : null,
         stock: Math.max(0, Math.floor(mappedNumber(row, mappings.stock))),
         imageUrl: validImageUrl(mappedText(row, mappings.variantImage)),
       };

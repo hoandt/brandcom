@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { FolderTree, Plus } from "lucide-react";
+import { FolderTree, Plus, RefreshCw } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import Image from "next/image";
@@ -52,6 +52,7 @@ export default function AdminProductsPage() {
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div><h1 className="text-2xl font-bold tracking-tight">{t("title")}</h1><p className="text-xs text-muted-foreground">{t("subtitle")}</p></div>
         <div className="flex gap-2">
+          <Button render={<Link href={`/${locale}/admin/products/migrate/shopee`} />} variant="outline" className="h-9 rounded-none px-4 text-xs font-bold uppercase tracking-wider"><RefreshCw className="mr-2 h-3.5 w-3.5" />Migrate Shopee</Button>
           <Button render={<Link href={`/${locale}/admin/categories`} />} variant="outline" className="h-9 rounded-none px-4 text-xs font-bold uppercase tracking-wider"><FolderTree className="mr-2 h-3.5 w-3.5" />{categoryT("manage")}</Button>
           <Button render={<Link href={`/${locale}/admin/products/new`} />} className="h-9 rounded-none px-4 text-xs font-bold uppercase tracking-wider"><Plus className="mr-2 h-3.5 w-3.5" />{t("add")}</Button>
         </div>

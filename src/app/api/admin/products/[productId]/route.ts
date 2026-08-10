@@ -53,10 +53,13 @@ export async function GET(_req: Request, { params }: { params: Promise<{ product
       id: product.id,
       name: product.name,
       slug: product.slug,
+      status: product.status,
       description: product.description || "",
       overview: product.overview || "",
       materials: product.materials || "",
       care: product.care || "",
+      cardHoverVideoUrl: product.cardHoverVideoUrl || "",
+      cardHoverImageUrl: product.cardHoverImageUrl || "",
       categoryIds: product.categories.map((category) => category.id),
       images: product.images.map((image) => image.url),
       variants: product.variants.map((variant) => ({
@@ -87,13 +90,19 @@ export async function PUT(
     const overview = (formData.get("overview") as string) || "";
     const materials = (formData.get("materials") as string) || "";
     const care = (formData.get("care") as string) || "";
+    let cardHoverVideoUrl = (formData.get("cardHoverVideoUrl") as string) || "";
+    const cardHoverImageUrl = (formData.get("cardHoverImageUrl") as string) || "";
+    const submittedStatus = formData.get("status");
+    const status = typeof submittedStatus === "string" && ["DRAFT", "ACTIVE", "ARCHIVED"].includes(submittedStatus)
+      ? submittedStatus as "DRAFT" | "ACTIVE" | "ARCHIVED"
+      : null;
     const variantsStr = formData.get("variants") as string;
     const categoryIds = parseCategoryIds(formData.get("categoryIds"));
     const mainImageType = formData.get("mainImageType");
     const mainImageValue = formData.get("mainImageValue");
 
-    if (!name || !variantsStr) {
-      return NextResponse.json({ error: "Missing name or variants data" }, { status: 400 });
+    if (!name || !variantsStr || !status) {
+      return NextResponse.json({ error: "Missing or invalid name, status, or variants data" }, { status: 400 });
     }
 
     let variants: SubmittedVariant[] = [];
@@ -151,6 +160,13 @@ export async function PUT(
     // Handle new uploads
     const newImages = formData.getAll("images") as File[];
     const newImageUrls: string[] = [];
+
+    const cardHoverVideo = formData.get("cardHoverVideo") as File | null;
+    if (cardHoverVideo?.size) {
+      if (!cardHoverVideo.type.startsWith("video/")) return NextResponse.json({ error: "Card hover media must be a video" }, { status: 400 });
+      if (cardHoverVideo.size > 25 * 1024 * 1024) return NextResponse.json({ error: "Card hover video must be 25 MB or smaller" }, { status: 400 });
+      cardHoverVideoUrl = await uploadFileToR2(Buffer.from(await cardHoverVideo.arrayBuffer()), cardHoverVideo.name, cardHoverVideo.type);
+    }
 
     for (const image of newImages) {
       if (image && image.size > 0) {
@@ -286,10 +302,13 @@ export async function PUT(
           data: {
             name,
             slug,
+            status,
             description,
             overview,
             materials,
             care,
+            cardHoverVideoUrl: cardHoverVideoUrl || null,
+            cardHoverImageUrl: cardHoverImageUrl || null,
             categories: { set: categoryIds.map((id) => ({ id })) },
           },
         }),
