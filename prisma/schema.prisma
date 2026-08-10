@@ -13,23 +13,26 @@ datasource db {
 }
 
 model StoreSettings {
-  id                  String   @id @default(cuid())
-  tenantId            String   @unique
-  storeName           String
-  legalName           String?
-  tagline             String?
-  supportEmail        String?
-  supportPhone        String?
-  defaultLocale       String   @default("vi")
-  currency            String   @default("VND")
-  timezone            String   @default("Asia/Ho_Chi_Minh")
-  orderPrefix         String   @default("ORD")
-  fallbackShippingFee Int      @default(30000)
-  lowStockThreshold   Int      @default(5)
-  marketplaceShopId   String?
-  marketplaceShops    Json     @default("[]")
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  id                       String   @id @default(cuid())
+  tenantId                 String   @unique
+  storeName                String
+  legalName                String?
+  tagline                  String?
+  supportEmail             String?
+  supportPhone             String?
+  defaultLocale            String   @default("vi")
+  currency                 String   @default("VND")
+  timezone                 String   @default("Asia/Ho_Chi_Minh")
+  orderPrefix              String   @default("ORD")
+  fallbackShippingFee      Int      @default(30000)
+  lowStockThreshold        Int      @default(5)
+  marketplaceShopId        String?
+  marketplaceShops         Json     @default("[]")
+  orderNotificationEnabled Boolean  @default(true)
+  orderNotificationEmail   String?
+  orderNotificationEmails  Json     @default("[]")
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
 }
 
 model CarrierSettings {

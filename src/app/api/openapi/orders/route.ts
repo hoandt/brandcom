@@ -5,6 +5,7 @@ import { allocateInventory } from "@/lib/inventory";
 import { authenticateOpenApi } from "@/lib/openapi-auth";
 import { getStoreSettings } from "@/lib/store-settings";
 import { Prisma } from "@/generated/prisma/client";
+import { sendNewOrderNotification } from "@/lib/order-notification";
 
 const orderStatuses = ["PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED"] as const;
 const paymentStatuses = ["PENDING", "PAID", "REFUNDED"] as const;
@@ -140,6 +141,8 @@ export async function POST(request: Request) {
 
       return createdOrder;
     }, { isolationLevel: "Serializable" });
+
+    await sendNewOrderNotification(order.id, storeSettings.currency);
 
     return NextResponse.json({
       success: true,

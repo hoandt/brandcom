@@ -19,6 +19,11 @@ export const DEFAULT_STORE_SETTINGS = {
   marketplaceShops: process.env.DEFAULT_MARKETPLACE_SHOP_ID
     ? [{ marketplace: "shopee", shopId: process.env.DEFAULT_MARKETPLACE_SHOP_ID }]
     : [],
+  orderNotificationEnabled: true,
+  orderNotificationEmail: process.env.ORDER_NOTIFICATION_EMAIL || process.env.SMTP_USER || null,
+  orderNotificationEmails: process.env.ORDER_NOTIFICATION_EMAIL
+    ? process.env.ORDER_NOTIFICATION_EMAIL.split(",").map((email) => email.trim()).filter(Boolean)
+    : process.env.SMTP_USER ? [process.env.SMTP_USER] : [],
 };
 
 export async function getStoreSettings(tenantId = DEFAULT_TENANT_ID) {

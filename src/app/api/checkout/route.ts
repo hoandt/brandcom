@@ -4,6 +4,7 @@ import { z } from "zod";
 import { auth } from "@/auth";
 import { allocateInventory } from "@/lib/inventory";
 import { getStoreSettings } from "@/lib/store-settings";
+import { sendNewOrderNotification } from "@/lib/order-notification";
 
 const checkoutSchema = z.object({
   customerName: z.string().min(1, "Name is required"),
@@ -215,6 +216,8 @@ export async function POST(req: Request) {
 
       return newOrder;
     }, { isolationLevel: "Serializable" });
+
+    await sendNewOrderNotification(order.id, storeSettings.currency);
 
     return NextResponse.json({ success: true, orderId: order.id, orderNumber: order.orderNumber }, { status: 201 });
   } catch (error: unknown) {

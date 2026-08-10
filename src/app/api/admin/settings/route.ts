@@ -26,6 +26,9 @@ const schema = z.object({
     marketplace: z.enum(["shopee", "lazada", "tiktok_shop"]),
     shopId: z.string().trim().min(1, "Shop ID is required").max(64),
   })).max(20).default([]),
+  orderNotificationEnabled: z.boolean().default(true),
+  orderNotificationEmail: z.union([z.string().trim().email().max(320), z.literal(""), z.null()]).optional().transform((value) => value || null),
+  orderNotificationEmails: z.array(z.string().trim().email().max(320)).max(20).default([]).transform((emails) => [...new Set(emails.map((email) => email.toLowerCase()))]),
 });
 
 async function authorize() {
@@ -36,7 +39,9 @@ async function authorize() {
 export async function GET() {
   if (!(await authorize())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const settings = await getStoreSettings();
-  return NextResponse.json({ settings });
+  const storedEmails = Array.isArray(settings.orderNotificationEmails) ? settings.orderNotificationEmails.filter((email): email is string => typeof email === "string") : [];
+  const fallbackEmail = settings.orderNotificationEmail || process.env.ORDER_NOTIFICATION_EMAIL || process.env.SMTP_USER || null;
+  return NextResponse.json({ settings: { ...settings, orderNotificationEmail: fallbackEmail, orderNotificationEmails: storedEmails.length > 0 ? storedEmails : fallbackEmail ? [fallbackEmail] : [] } });
 }
 
 export async function PUT(request: Request) {
@@ -45,10 +50,11 @@ export async function PUT(request: Request) {
     const data = schema.parse(await request.json());
     const marketplaceShopId = data.marketplaceShops.find((shop) => shop.marketplace === "shopee")?.shopId
       ?? data.marketplaceShopId;
+    const orderNotificationEmail = data.orderNotificationEmails[0] ?? data.orderNotificationEmail;
     const settings = await prisma.storeSettings.upsert({
       where: { tenantId: DEFAULT_TENANT_ID },
-      update: { ...data, marketplaceShopId },
-      create: { ...data, marketplaceShopId, tenantId: DEFAULT_TENANT_ID },
+      update: { ...data, marketplaceShopId, orderNotificationEmail },
+      create: { ...data, marketplaceShopId, orderNotificationEmail, tenantId: DEFAULT_TENANT_ID },
     });
     return NextResponse.json({ settings });
   } catch (error) {

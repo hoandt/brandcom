@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Building2, Globe2, Loader2, PackageCheck, Plus, Save, Store, Trash2, Truck } from "lucide-react";
+import { BellRing, Building2, ChevronRight, Globe2, Loader2, PackageCheck, Plus, Save, Store, Trash2, Truck } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,19 +15,33 @@ type Settings = {
   currency: string; timezone: string; orderPrefix: string; fallbackShippingFee: number;
   lowStockThreshold: number; marketplaceShopId: string | null;
   marketplaceShops: { marketplace: "shopee" | "lazada" | "tiktok_shop"; shopId: string }[];
+  orderNotificationEnabled: boolean; orderNotificationEmail: string | null;
+  orderNotificationEmails: string[];
 };
 
 const emptySettings: Settings = {
   tenantId: "", storeName: "", legalName: "", tagline: "", supportEmail: "", supportPhone: "",
   defaultLocale: "vi", currency: "VND", timezone: "Asia/Ho_Chi_Minh", orderPrefix: "ORD",
   fallbackShippingFee: 30000, lowStockThreshold: 5, marketplaceShopId: null, marketplaceShops: [],
+  orderNotificationEnabled: true, orderNotificationEmail: null,
+  orderNotificationEmails: [],
 };
+
+const settingsSections = [
+  { id: "identity", label: "Store identity", icon: Building2 },
+  { id: "regional", label: "Regional", icon: Globe2 },
+  { id: "orders", label: "Orders & inventory", icon: PackageCheck },
+  { id: "notifications", label: "Notifications", icon: BellRing },
+  { id: "marketplace", label: "Marketplace", icon: Store },
+  { id: "shipping", label: "Shipping", icon: Truck },
+];
 
 export default function AdminSettingsPage() {
   const params = useParams<{ locale: string }>();
   const queryClient = useQueryClient();
   const [form, setForm] = useState<Settings>(emptySettings);
   const [error, setError] = useState<string | null>(null);
+  const [activeSection, setActiveSection] = useState(settingsSections[0].id);
   const query = useQuery<{ settings: Settings }>({
     queryKey: ["admin-settings"],
     queryFn: async () => {
@@ -51,6 +65,15 @@ export default function AdminSettingsPage() {
       setForm({ ...settings, marketplaceShops });
     }
   }, [query.data]);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver((entries) => {
+      const visible = entries.filter((entry) => entry.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+      if (visible) setActiveSection(visible.target.id);
+    }, { rootMargin: "-20% 0px -65%", threshold: [0, 0.25, 0.5] });
+    settingsSections.forEach(({ id }) => { const element = document.getElementById(id); if (element) observer.observe(element); });
+    return () => observer.disconnect();
+  }, [query.isSuccess]);
 
   const save = useMutation({
     mutationFn: async () => {
@@ -80,7 +103,7 @@ export default function AdminSettingsPage() {
   if (query.isError) return <div className="border border-destructive bg-destructive/5 p-4 text-sm text-destructive">{query.error.message}</div>;
 
   return (
-    <form onSubmit={(event) => { event.preventDefault(); save.mutate(); }} className="mx-auto flex w-full max-w-6xl flex-col gap-5">
+    <form onSubmit={(event) => { event.preventDefault(); save.mutate(); }} className="mx-auto flex w-full max-w-7xl flex-col gap-5">
       <div className="flex items-center justify-between">
         <div><h1 className="text-2xl font-bold tracking-tight">Global settings</h1><p className="text-xs text-muted-foreground">Tenant-wide configuration used by the storefront, checkout and operations.</p></div>
         <Button type="submit" disabled={save.isPending} className="h-9 rounded-none px-5 text-xs uppercase tracking-wider">
@@ -88,7 +111,13 @@ export default function AdminSettingsPage() {
         </Button>
       </div>
 
-      <SettingsSection icon={Building2} title="Store identity" description="Public names and support contacts shown throughout the application.">
+      <div className="grid items-start gap-5 lg:grid-cols-[220px_minmax(0,1fr)]">
+        <nav className="sticky top-20 z-20 -mx-1 flex gap-1 overflow-x-auto border-y bg-background/95 p-1 backdrop-blur lg:mx-0 lg:grid lg:overflow-visible lg:border [&::-webkit-scrollbar]:hidden" aria-label="Settings sections">
+          {settingsSections.map(({ id, label, icon: Icon }) => <button key={id} type="button" onClick={() => { setActiveSection(id); document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }); }} className={`flex h-10 shrink-0 items-center gap-2 px-3 text-left text-[11px] font-semibold transition-colors lg:w-full ${activeSection === id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}><Icon className="h-3.5 w-3.5" /><span>{label}</span><ChevronRight className="ml-auto hidden h-3.5 w-3.5 lg:block" /></button>)}
+        </nav>
+
+        <div className="grid min-w-0 gap-5">
+      <SettingsSection id="identity" icon={Building2} title="Store identity" description="Public names and support contacts shown throughout the application.">
         <Field label="Store name"><Input required value={form.storeName} onChange={(event) => setForm({ ...form, storeName: event.target.value })} /></Field>
         <Field label="Legal name"><Input value={form.legalName || ""} onChange={(event) => setForm({ ...form, legalName: event.target.value })} /></Field>
         <Field label="Support email"><Input type="email" value={form.supportEmail || ""} onChange={(event) => setForm({ ...form, supportEmail: event.target.value })} /></Field>
@@ -96,19 +125,32 @@ export default function AdminSettingsPage() {
         <div className="md:col-span-2"><Field label="Tagline"><Input value={form.tagline || ""} onChange={(event) => setForm({ ...form, tagline: event.target.value })} /></Field></div>
       </SettingsSection>
 
-      <SettingsSection icon={Globe2} title="Regional settings" description="Formatting defaults for this tenant.">
+      <SettingsSection id="regional" icon={Globe2} title="Regional settings" description="Formatting defaults for this tenant.">
         <Field label="Default locale"><Select value={form.defaultLocale} onChange={(value) => setForm({ ...form, defaultLocale: value as Settings["defaultLocale"] })}><option value="vi">Vietnamese</option><option value="en">English</option><option value="th">Thai</option></Select></Field>
         <Field label="Currency"><Input maxLength={3} value={form.currency} onChange={(event) => setForm({ ...form, currency: event.target.value.toUpperCase() })} /></Field>
         <Field label="Timezone"><Select value={form.timezone} onChange={(timezone) => setForm({ ...form, timezone })}><option value="Asia/Ho_Chi_Minh">Asia/Ho Chi Minh</option><option value="Asia/Bangkok">Asia/Bangkok</option><option value="UTC">UTC</option></Select></Field>
         <Field label="Tenant ID"><Input value={form.tenantId} disabled /><span className="text-[10px] font-normal text-muted-foreground">Resolved server-side; becomes the SaaS tenant key.</span></Field>
       </SettingsSection>
 
-      <SettingsSection icon={PackageCheck} title="Orders and inventory" description="Operational defaults used by order numbering and inventory alerts.">
+      <SettingsSection id="orders" icon={PackageCheck} title="Orders and inventory" description="Operational defaults used by order numbering and inventory alerts.">
         <Field label="Order prefix"><Input required value={form.orderPrefix} onChange={(event) => setForm({ ...form, orderPrefix: event.target.value.toUpperCase() })} /></Field>
         <Field label="Low-stock threshold"><Input type="number" min="0" value={form.lowStockThreshold} onChange={(event) => setForm({ ...form, lowStockThreshold: Number(event.target.value) })} /></Field>
       </SettingsSection>
 
-      <SettingsSection icon={Store} title="Marketplace" description="Connection identifiers used by marketplace migration and synchronization tools.">
+      <SettingsSection id="notifications" icon={BellRing} title="Admin notifications" description="Internal alerts for store administrators. Customer notifications will be handled separately through Zalo later.">
+        <div className="flex min-h-12 items-center justify-between gap-4 border px-4 py-3">
+          <div><p className="text-xs font-bold uppercase tracking-wider">New-order email</p><p className="mt-1 text-[10px] text-muted-foreground">Send an email only to the admin recipient after an order is created.</p></div>
+          <input type="checkbox" checked={form.orderNotificationEnabled} onChange={(event) => setForm({ ...form, orderNotificationEnabled: event.target.checked })} aria-label="Enable new-order admin email" className="h-5 w-5 accent-primary" />
+        </div>
+        <div className="grid gap-2 md:col-span-2">
+          <div className="flex items-center justify-between"><p className="text-xs font-bold uppercase tracking-wider">Admin recipient emails</p><Button type="button" variant="outline" disabled={!form.orderNotificationEnabled || form.orderNotificationEmails.length >= 20} onClick={() => setForm({ ...form, orderNotificationEmails: [...form.orderNotificationEmails, ""] })} className="h-8 rounded-none px-3 text-[10px]"><Plus className="mr-1.5 h-3.5 w-3.5" />Add email</Button></div>
+          {form.orderNotificationEmails.length === 0 && <div className="border border-dashed p-4 text-center text-xs text-muted-foreground">No admin recipients configured.</div>}
+          {form.orderNotificationEmails.map((email, index) => <div key={index} className="grid grid-cols-[minmax(0,1fr)_44px] gap-2"><Input type="email" required={form.orderNotificationEnabled} disabled={!form.orderNotificationEnabled} value={email} onChange={(event) => setForm({ ...form, orderNotificationEmails: form.orderNotificationEmails.map((item, itemIndex) => itemIndex === index ? event.target.value : item) })} placeholder="orders@example.com" /><Button type="button" variant="outline" disabled={!form.orderNotificationEnabled} aria-label={`Remove recipient ${email || index + 1}`} onClick={() => setForm({ ...form, orderNotificationEmails: form.orderNotificationEmails.filter((_, itemIndex) => itemIndex !== index) })} className="h-12 rounded-none px-0 text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></Button></div>)}
+          <span className="text-[10px] text-muted-foreground">Every configured admin receives the same order alert. SMTP credentials remain server-side.</span>
+        </div>
+      </SettingsSection>
+
+      <SettingsSection id="marketplace" icon={Store} title="Marketplace" description="Connection identifiers used by marketplace migration and synchronization tools.">
         <div className="grid gap-3 md:col-span-2">
           {form.marketplaceShops.length === 0 && <div className="border border-dashed p-5 text-center text-xs text-muted-foreground">No marketplace shops connected yet.</div>}
           {form.marketplaceShops.map((shop, index) => (
@@ -125,19 +167,21 @@ export default function AdminSettingsPage() {
         </div>
       </SettingsSection>
 
-      <SettingsSection icon={Truck} title="Shipping" description="Safe operational defaults. Carrier credentials remain environment secrets.">
+      <SettingsSection id="shipping" icon={Truck} title="Shipping" description="Safe operational defaults. Carrier credentials remain environment secrets.">
         <Field label="Fallback shipping fee"><Input type="number" min="0" value={form.fallbackShippingFee} onChange={(event) => setForm({ ...form, fallbackShippingFee: Number(event.target.value) })} /><span className="text-[10px] font-normal text-muted-foreground">Used only when the carrier cannot return a quote.</span></Field>
         <div className="flex items-end"><Button render={<Link href={`/${params.locale}/admin/settings/shipping`} />} variant="outline" className="h-12 w-full rounded-none">Configure carrier defaults</Button></div>
       </SettingsSection>
 
       {error && <p className="border border-destructive bg-destructive/5 p-3 text-sm text-destructive">{error}</p>}
       <div className="flex justify-end border-t pt-4"><Button type="submit" disabled={save.isPending} className="h-10 rounded-none px-6 text-xs uppercase tracking-wider">{save.isPending ? "Saving…" : "Save settings"}</Button></div>
+        </div>
+      </div>
     </form>
   );
 }
 
-function SettingsSection({ icon: Icon, title, description, children }: { icon: React.ElementType; title: string; description: string; children: React.ReactNode }) {
-  return <section className="border bg-card"><div className="flex gap-3 border-b bg-muted/20 p-4"><Icon className="mt-0.5 h-4 w-4 text-primary" /><div><h2 className="text-sm font-bold">{title}</h2><p className="text-xs text-muted-foreground">{description}</p></div></div><div className="grid gap-4 p-4 md:grid-cols-2">{children}</div></section>;
+function SettingsSection({ id, icon: Icon, title, description, children }: { id: string; icon: React.ElementType; title: string; description: string; children: React.ReactNode }) {
+  return <section id={id} className="scroll-mt-36 border bg-card lg:scroll-mt-20"><div className="flex gap-3 border-b bg-muted/20 p-4"><Icon className="mt-0.5 h-4 w-4 text-primary" /><div><h2 className="text-sm font-bold">{title}</h2><p className="text-xs text-muted-foreground">{description}</p></div></div><div className="grid gap-4 p-4 md:grid-cols-2">{children}</div></section>;
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="grid gap-1.5 text-xs font-bold uppercase tracking-wider">{label}{children}</label>; }
