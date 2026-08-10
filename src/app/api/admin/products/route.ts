@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { uploadFileToR2 } from "@/lib/r2";
 import { slugify } from "@/lib/slugify";
 import { revalidateTag } from "next/cache";
+import { z } from "zod";
 
 async function authorized() {
   const session = await auth();
@@ -52,6 +53,37 @@ export async function GET() {
     orderBy: { createdAt: "desc" },
   });
   return NextResponse.json({ products });
+}
+
+const bulkDeleteSchema = z.object({
+  productIds: z.array(z.string().trim().min(1)).min(1).max(100).transform((ids) => [...new Set(ids)]),
+});
+
+export async function DELETE(req: Request) {
+  if (!(await authorized())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  try {
+    const parsed = bulkDeleteSchema.safeParse(await req.json());
+    if (!parsed.success) return NextResponse.json({ error: "Select between 1 and 100 products", details: parsed.error.flatten() }, { status: 422 });
+    const productIds = parsed.data.productIds;
+    const products = await prisma.product.findMany({ where: { id: { in: productIds } }, select: { id: true, variants: { select: { id: true } } } });
+    const foundIds = products.map((product) => product.id);
+    const variantIds = products.flatMap((product) => product.variants.map((variant) => variant.id));
+
+    const result = await prisma.$transaction(async (tx) => {
+      const inventories = variantIds.length > 0 ? await tx.warehouseInventory.deleteMany({ where: { variantId: { in: variantIds } } }) : { count: 0 };
+      const variants = await tx.productVariant.deleteMany({ where: { productId: { in: foundIds } } });
+      const images = await tx.productImage.deleteMany({ where: { productId: { in: foundIds } } });
+      const reviews = await tx.productReview.deleteMany({ where: { productId: { in: foundIds } } });
+      const deletedProducts = await tx.product.deleteMany({ where: { id: { in: foundIds } } });
+      return { products: deletedProducts.count, variants: variants.count, inventories: inventories.count, images: images.count, reviews: reviews.count };
+    });
+
+    revalidateTag("products");
+    return NextResponse.json({ success: true, deleted: result });
+  } catch (error) {
+    console.error("[BULK_DELETE_PRODUCTS_ERROR]", error);
+    return NextResponse.json({ error: "Failed to delete selected products" }, { status: 500 });
+  }
 }
 
 export async function POST(req: Request) {
