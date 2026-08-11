@@ -11,7 +11,7 @@ import {
   SidebarMenuItem,
   SidebarFooter,
 } from "@/components/ui/sidebar"
-import { Package, LayoutDashboard, ShoppingCart, Users, Tag, Settings, FileText, LogOut, ChevronUp, Warehouse, FolderTree, MessageSquareText } from "lucide-react"
+import { Package, LayoutDashboard, ShoppingCart, Users, Tag, Settings, FileText, LogOut, ChevronUp, Warehouse, FolderTree, MessageSquareText, Truck } from "lucide-react"
 import { signOut } from "next-auth/react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -64,6 +64,11 @@ const items = [
     title: "Reviews",
     url: "/admin/reviews",
     icon: MessageSquareText,
+  },
+  {
+    title: "Carriers",
+    url: "/admin/carriers",
+    icon: Truck,
   },
   {
     title: "Warehouses",
