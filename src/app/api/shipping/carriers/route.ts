@@ -2,46 +2,42 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_TENANT_ID } from "@/lib/store-settings";
 
-const CARRIER_NAMES: Record<string, string> = {
-  spx: "SPX Express",
-  jnt: "J&T Express",
-  grab: "GrabExpress",
-  ghtk: "Giao Hàng Tiết Kiệm (GHTK)",
-  vtp: "Viettel Post",
-  vnpost: "VNPost",
-};
-
 export async function GET() {
   try {
     const settings = await prisma.carrierSettings.findMany({
       where: {
         tenantId: DEFAULT_TENANT_ID,
+        enabled: true,
       },
       select: {
         carrier: true,
-        enabled: true,
+        senderName: true,
         serviceType: true,
+        defaultCodAmount: true,
+        defaultDeliverInstruction: true,
       },
-      orderBy: { carrier: "asc" },
+      orderBy: { createdAt: "asc" },
     });
 
-    const settingsMap = new Map(settings.map((s) => [s.carrier.toLowerCase(), s]));
+    const activeCarriers = settings.map((s) => {
+      let sla = "1-3 business days";
+      if (s.defaultDeliverInstruction) {
+        try {
+          const meta = JSON.parse(s.defaultDeliverInstruction);
+          if (meta.sla) sla = meta.sla;
+        } catch {
+          sla = s.defaultDeliverInstruction;
+        }
+      }
 
-    const DEFAULT_ENABLED_CARRIERS = ["spx", "jnt", "grab"];
-
-    const activeCarriers = Object.keys(CARRIER_NAMES)
-      .filter((carrierKey) => {
-        const s = settingsMap.get(carrierKey);
-        return s ? s.enabled : DEFAULT_ENABLED_CARRIERS.includes(carrierKey);
-      })
-      .map((carrierKey) => {
-        const s = settingsMap.get(carrierKey);
-        return {
-          id: carrierKey,
-          name: CARRIER_NAMES[carrierKey],
-          serviceType: s ? s.serviceType : 1,
-        };
-      });
+      return {
+        id: s.carrier,
+        name: s.senderName || s.carrier.toUpperCase(),
+        serviceType: s.serviceType,
+        baseFee: s.defaultCodAmount || 25000,
+        estimatedDelivery: sla,
+      };
+    });
 
     return NextResponse.json({
       carriers: activeCarriers,

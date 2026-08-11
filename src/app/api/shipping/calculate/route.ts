@@ -10,7 +10,25 @@ export async function POST(req: Request) {
     const { location, items, recipient, isCod, codAmount, carrier } = body;
 
     if (carrier && carrier !== SPX_CARRIER) {
-      return NextResponse.json({ error: 'Unsupported shipping carrier' }, { status: 400 });
+      const selectedCarrier = await prisma.carrierSettings.findFirst({
+        where: {
+          tenantId: 'default',
+          carrier: String(carrier).toLowerCase(),
+          enabled: true,
+        },
+      });
+
+      if (!selectedCarrier) {
+        return NextResponse.json({ error: 'Unsupported or inactive shipping carrier' }, { status: 400 });
+      }
+
+      const storeSettings = await getStoreSettings();
+      return NextResponse.json({
+        fee: selectedCarrier.defaultCodAmount || storeSettings.fallbackShippingFee,
+        carrier: selectedCarrier.carrier,
+        carrierName: selectedCarrier.senderName || selectedCarrier.carrier.toUpperCase(),
+        isCalculated: true,
+      });
     }
     const locationName = (value: unknown) =>
       typeof value === 'string'
