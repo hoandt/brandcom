@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { marked } from "marked"
-import { Bold, Italic, Heading3, Link2, List } from "lucide-react"
+import { Bold, Italic, Heading3, Link2, List, Image as ImageIcon } from "lucide-react"
 
 interface MarkdownEditorProps {
   id: string
@@ -26,6 +26,7 @@ export function MarkdownEditor({
   const [internalValue, setInternalValue] = useState(value)
   const [activeTab, setActiveTab] = useState<"write" | "preview">("write")
   const [previewHtml, setPreviewHtml] = useState("")
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // Keep internal state synced with outer value prop
@@ -158,6 +159,49 @@ export function MarkdownEditor({
               >
                 <List className="h-3.5 w-3.5" />
               </button>
+              <label
+                className="p-1.5 rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex items-center justify-center"
+                title={isUploadingMedia ? "Uploading to Cloudflare..." : "Upload Image/Video to Cloudflare"}
+              >
+                {isUploadingMedia ? (
+                  <span className="w-3.5 h-3.5 border-2 border-primary border-r-transparent rounded-full animate-spin" />
+                ) : (
+                  <ImageIcon className="h-3.5 w-3.5" />
+                )}
+                <input
+                  type="file"
+                  accept="image/*,video/*"
+                  className="hidden"
+                  disabled={isUploadingMedia}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setIsUploadingMedia(true);
+                    try {
+                      const formData = new FormData();
+                      formData.append("file", file);
+                      const res = await fetch("/api/admin/upload", {
+                        method: "POST",
+                        body: formData,
+                      });
+                      if (!res.ok) throw new Error("Upload failed");
+                      const data = await res.json();
+                      if (data.url) {
+                        if (file.type.startsWith("video/")) {
+                          insertMarkdown(`<video src="${data.url}" controls class="w-full rounded-lg" />`);
+                        } else {
+                          insertMarkdown(`![${file.name}](${data.url})`);
+                        }
+                      }
+                    } catch (err) {
+                      alert("Failed to upload file to Cloudflare");
+                    } finally {
+                      setIsUploadingMedia(false);
+                      e.target.value = "";
+                    }
+                  }}
+                />
+              </label>
             </div>
           )}
         </div>

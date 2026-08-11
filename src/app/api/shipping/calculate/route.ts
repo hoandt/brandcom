@@ -7,7 +7,11 @@ import { getSPXSettings, SPX_CARRIER } from '@/lib/shipping/settings';
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { location, items, recipient, isCod, codAmount } = body;
+    const { location, items, recipient, isCod, codAmount, carrier } = body;
+
+    if (carrier && carrier !== SPX_CARRIER) {
+      return NextResponse.json({ error: 'Unsupported shipping carrier' }, { status: 400 });
+    }
     const locationName = (value: unknown) =>
       typeof value === 'string'
         ? value.trim()
@@ -75,8 +79,38 @@ export async function POST(req: Request) {
       return name;
     };
 
-    const spxProvince = sanitizeSPXLocation(destination.province);
+    let spxProvince = sanitizeSPXLocation(destination.province);
     let spxDistrict = sanitizeSPXLocation(destination.district);
+    let spxWard = destination.ward;
+
+    // Server-side secret location mapping resolution (never exposed to FE)
+    const wardId = location?.wardId || (typeof location?.ward === "object" ? location?.ward?.location_id : null);
+    const provinceId = location?.provinceId || (typeof location?.province === "object" ? location?.province?.location_id : null);
+
+    if (wardId) {
+      try {
+        const lookupPid = provinceId || wardId;
+        const lookupRes = await fetch(
+          `https://app.swifthub.net/api/swifthub/locations?country=VN&parent_id=${encodeURIComponent(lookupPid)}`,
+          { next: { revalidate: 24 * 3600 } }
+        );
+        if (lookupRes.ok) {
+          const lookupJson = await lookupRes.json();
+          const items = Array.isArray(lookupJson.data) ? lookupJson.data : Array.isArray(lookupJson) ? lookupJson : [];
+          const found = items.find((item: any) => item.location_id === wardId);
+          const mappings = found?.shipping_mappings?.spx;
+          const resolved = Array.isArray(mappings) ? mappings[0] : mappings;
+          if (resolved?.province && resolved?.district && resolved?.ward) {
+            spxProvince = sanitizeSPXLocation(resolved.province);
+            spxDistrict = sanitizeSPXLocation(resolved.district);
+            spxWard = resolved.ward;
+          }
+        }
+      } catch (err) {
+        console.warn("Server-side SPX location mapping resolution fallback:", err);
+      }
+    }
+
     if (spxDistrict.toLowerCase().includes('thủ đức')) spxDistrict = 'Thành Phố Thủ Đức';
 
     const order: Omit<SPXOrder, 'user_id' | 'user_secret'> = {
@@ -133,7 +167,7 @@ export async function POST(req: Request) {
         deliver_country: carrierSettings.senderCountry,
         deliver_state: spxProvince,
         deliver_city: spxDistrict,
-        deliver_district: destination.ward,
+        deliver_district: spxWard,
         deliver_detail_address:
           typeof location.detailAddress === 'string' && location.detailAddress.trim()
             ? location.detailAddress.trim()
@@ -171,6 +205,7 @@ export async function POST(req: Request) {
 
     if (response.ret_code === 0 && response.data.orders.length > 0) {
       const shippingFee = response.data.orders[0].estimated_shipping_fee;
+
       return NextResponse.json({
         fee: shippingFee,
         carrier: SPX_CARRIER,

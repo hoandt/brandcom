@@ -104,6 +104,7 @@ type AddressPayload = Omit<Address, "id">;
 
 type AddressBookModalProps = {
   onSelectAddress: (address: Address) => void;
+  selectedAddressId?: string | null;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
 };
@@ -165,6 +166,7 @@ function formatPhone(phone: string) {
 
 export function AddressBookModal({
   onSelectAddress,
+  selectedAddressId,
   isOpen,
   onOpenChange,
 }: AddressBookModalProps) {
@@ -775,66 +777,83 @@ export function AddressBookModal({
                   </Button>
                 </div>
               ) : addresses.length > 0 ? (
-                <div className="space-y-3">
-                  {addresses.map((address) => (
-                    <div
-                      key={address.id}
-                      className={`
-                        relative overflow-hidden rounded-sm
-                        border shadow-sm transition-all duration-150
-                        hover:bg-secondary/20 active:scale-[0.99]
-                        focus-within:border-primary focus-within:ring-1 focus-within:ring-primary focus-within:bg-primary/[0.02]
-                        ${address.isDefault ? 'border-primary bg-primary/[0.02]' : 'border-border bg-card'}
-                      `}
-                    >
-                      <button
-                        type="button"
-                        className="
-                          w-full flex items-center
-                          gap-3.5 p-4 pr-[110px] sm:pr-[190px] text-left
-                          outline-none focus:outline-none transition-colors
-                        "
-                        onClick={() => handleSelect(address)}
-                      >
+                (() => {
+                  const defaultAddressId = addresses.find((a) => a.isDefault)?.id || addresses[0]?.id || null;
+                  const effectiveSelectedId = selectedAddressId && addresses.some((a) => a.id === selectedAddressId)
+                    ? selectedAddressId
+                    : defaultAddressId;
 
-
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                            <span className="font-semibold text-foreground text-[15px]">
-                              {address.name}
-                            </span>
-
-                            <span className="text-sm text-muted-foreground">
-                              {formatPhone(address.phone)}
-                            </span>
-                          </div>
-
-                          <div className="mt-1 text-sm leading-relaxed">
-                            <p className="font-medium text-foreground text-[14px]">
-                              {address.address}
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              {[address.wardName, address.districtName, address.provinceName]
-                                .filter(Boolean)
-                                .join(", ")}
-                            </p>
-                          </div>
-
-                          {address.isDefault && (
-                            <span
-                              className="
-                                mt-2 inline-flex items-center gap-1
-                                rounded-full bg-primary/10
-                                px-2.5 py-0.5 text-[11px]
-                                font-semibold text-primary
-                              "
+                  return (
+                    <div className="space-y-3">
+                      {addresses.map((address) => {
+                        const isSelected = address.id === effectiveSelectedId;
+                        return (
+                          <div
+                            key={address.id}
+                            className={cn(
+                              "relative overflow-hidden rounded-xl border transition-all duration-200",
+                              isSelected
+                                ? "border-primary bg-primary/[0.04] shadow-[0_0_0_1px_hsl(var(--primary)/0.3)]"
+                                : "border-border/60 bg-card hover:border-primary/40 hover:bg-secondary/20"
+                            )}
+                          >
+                            <button
+                              type="button"
+                              className="w-full flex items-start gap-3.5 p-4 pr-[110px] sm:pr-[190px] text-left outline-none transition-colors cursor-pointer"
+                              onClick={() => handleSelect(address)}
                             >
-                              <CircleCheck className="h-3 w-3" />
-                              Mặc định
-                            </span>
-                          )}
-                        </div>
-                      </button>
+                              {/* Selected radio indicator */}
+                              <div className="mt-0.5 shrink-0">
+                                <div
+                                  className={cn(
+                                    "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all",
+                                    isSelected
+                                      ? "border-primary bg-primary"
+                                      : "border-border/60 bg-background"
+                                  )}
+                                >
+                                  {isSelected && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+                                </div>
+                              </div>
+
+                              <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                  <span className="font-bold text-foreground text-[15px]">
+                                    {address.name}
+                                  </span>
+
+                                  <span className="text-xs font-medium text-muted-foreground">
+                                    {formatPhone(address.phone)}
+                                  </span>
+                                </div>
+
+                                <div className="mt-1 text-sm leading-relaxed">
+                                  <p className="font-medium text-foreground text-[14px]">
+                                    {address.address}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground mt-0.5">
+                                    {[address.wardName, address.districtName, address.provinceName]
+                                      .filter(Boolean)
+                                      .join(", ")}
+                                  </p>
+                                </div>
+
+                                <div className="mt-2.5 flex items-center gap-2 flex-wrap">
+                                  {isSelected && (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 border border-primary/20 px-2.5 py-0.5 text-[11px] font-bold text-primary">
+                                      <Check className="h-3 w-3" strokeWidth={3} />
+                                      Đang chọn
+                                    </span>
+                                  )}
+                                  {address.isDefault && (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-muted/60 border border-border/40 px-2.5 py-0.5 text-[11px] font-semibold text-muted-foreground">
+                                      <Star className="h-3 w-3 fill-muted-foreground/30" />
+                                      Mặc định
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </button>
 
                       <div className="absolute top-3 right-3 flex items-center gap-1 z-10">
                         {!address.isDefault && (
@@ -887,8 +906,11 @@ export function AddressBookModal({
                         </Button>
                       </div>
                     </div>
-                  ))}
-                </div>
+                  );
+                })}
+              </div>
+            );
+          })()
               ) : (
                 <div className="flex min-h-[280px] flex-col items-center justify-center px-6 text-center">
                   <div

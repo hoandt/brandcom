@@ -102,7 +102,9 @@ export function OrderDetailsClient({ id, locale, translations: t }: OrderDetails
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <h1 className="text-base font-bold">{t.orderDetails || "Chi tiết đơn hàng"}</h1>
+          <h1 className="text-base font-bold">{
+            order.orderNumber
+          }</h1>
         </div>
         <div className={`text-xs font-semibold ${order.orderStatus === 'CANCELLED' ? 'text-destructive' : 'text-primary'}`}>
           {getStatusText(order.orderStatus)}
@@ -142,10 +144,7 @@ export function OrderDetailsClient({ id, locale, translations: t }: OrderDetails
 
       {/* Items */}
       <div className="bg-card sm:border sm:border-border rounded-none overflow-hidden">
-        <div className="flex items-center gap-1.5 p-2.5 border-b border-border/50">
-          <Store className="w-4 h-4 text-muted-foreground" />
-          <h3 className="font-semibold text-xs text-foreground uppercase">{order.orderNumber || order.id}</h3>
-        </div>
+
         <div className="p-2.5 space-y-2">
           {order.items.map((item: any) => {
             const variant: any = variantMap.get(item.variantId);

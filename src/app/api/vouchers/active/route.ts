@@ -6,33 +6,43 @@ import { prisma } from "@/lib/prisma";
  * Returns currently valid, public vouchers for storefront display.
  * Optionally filters by productId (vouchers scoped to that product or all-product vouchers).
  */
+let activeVouchersCache: { data: any[]; expiresAt: number } | null = null;
+const VOUCHERS_CACHE_TTL = 30_000;
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const productId = searchParams.get("productId");
 
-    const now = new Date();
+    const now = Date.now();
+    let vouchers: any[];
 
-    const vouchers = await prisma.voucher.findMany({
-      where: {
-        status: "active",
-        startsAt: { lte: now },
-        endsAt: { gte: now },
-      },
-      select: {
-        id: true,
-        code: true,
-        name: true,
-        description: true,
-        benefit: true,
-        minimumCartSubtotal: true,
-        endsAt: true,
-        productIds: true,
-        totalUsageLimit: true,
-        consumedQuantity: true,
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    if (activeVouchersCache && activeVouchersCache.expiresAt > now) {
+      vouchers = activeVouchersCache.data;
+    } else {
+      const dbDate = new Date();
+      vouchers = await prisma.voucher.findMany({
+        where: {
+          status: "active",
+          startsAt: { lte: dbDate },
+          endsAt: { gte: dbDate },
+        },
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          description: true,
+          benefit: true,
+          minimumCartSubtotal: true,
+          endsAt: true,
+          productIds: true,
+          totalUsageLimit: true,
+          consumedQuantity: true,
+        },
+        orderBy: { createdAt: "desc" },
+      });
+      activeVouchersCache = { data: vouchers, expiresAt: now + VOUCHERS_CACHE_TTL };
+    }
 
     const filtered = vouchers
       .filter((v) => {
@@ -59,7 +69,14 @@ export async function GET(req: Request) {
         endsAt: v.endsAt.toISOString(),
       }));
 
-    return NextResponse.json({ vouchers: filtered });
+    return NextResponse.json(
+      { vouchers: filtered },
+      {
+        headers: {
+          "Cache-Control": "public, s-maxage=10, stale-while-revalidate=59",
+        },
+      }
+    );
   } catch (error) {
     console.error("Error fetching active vouchers:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

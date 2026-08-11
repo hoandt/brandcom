@@ -28,9 +28,14 @@ export async function sendNewOrderNotification(orderId: string, currency = "VND"
     ]);
     if (!order) return;
     if (!settings.orderNotificationEnabled) return;
-    const storedRecipients = Array.isArray(settings.orderNotificationEmails) ? settings.orderNotificationEmails.filter((email): email is string => typeof email === "string") : [];
-    const fallbackRecipients = (settings.orderNotificationEmail || process.env.ORDER_NOTIFICATION_EMAIL || user).split(",").map((email) => email.trim()).filter(Boolean);
-    const recipients = [...new Set(storedRecipients.length > 0 ? storedRecipients : fallbackRecipients)];
+    const storedRecipients: string[] = Array.isArray(settings.orderNotificationEmails)
+      ? (settings.orderNotificationEmails as unknown[]).filter((email: unknown): email is string => typeof email === "string")
+      : [];
+    const fallbackRecipients: string[] = (settings.orderNotificationEmail || process.env.ORDER_NOTIFICATION_EMAIL || user)
+      .split(",")
+      .map((email: string) => email.trim())
+      .filter(Boolean);
+    const recipients: string[] = Array.from(new Set(storedRecipients.length > 0 ? storedRecipients : fallbackRecipients));
     if (recipients.length === 0) return;
 
     const rows = order.items.map((item) => `<tr><td style="padding:8px;border-bottom:1px solid #eee">${escapeHtml(item.productName)}${item.variantName ? `<br><small>${escapeHtml(item.variantName)}</small>` : ""}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:center">${item.quantity}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:right">${money(Number(item.price) * item.quantity, currency)}</td></tr>`).join("");

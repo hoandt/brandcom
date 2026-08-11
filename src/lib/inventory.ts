@@ -7,7 +7,8 @@ export async function allocateInventory(
   variantId: string,
   requestedQuantity: number
 ): Promise<InventoryAllocation[]> {
-  const inventories = await tx.warehouseInventory.findMany({
+  // 1. Fetch inventories from active pickup warehouses
+  let inventories = await tx.warehouseInventory.findMany({
     where: {
       variantId,
       quantity: { gt: 0 },
@@ -17,9 +18,89 @@ export async function allocateInventory(
     orderBy: [{ warehouse: { isDefault: "desc" } }, { warehouse: { name: "asc" } }],
   });
 
-  const available = inventories.reduce((sum, inventory) => sum + inventory.quantity, 0);
+  let available = inventories.reduce((sum, inventory) => sum + inventory.quantity, 0);
+
+  // 2. If insufficient in pickup warehouses, check all active warehouses
   if (available < requestedQuantity) {
-    throw new Error(`Insufficient inventory. Only ${available} available across active pickup warehouses.`);
+    const allActiveInventories = await tx.warehouseInventory.findMany({
+      where: {
+        variantId,
+        quantity: { gt: 0 },
+        warehouse: { isActive: true },
+      },
+      include: { warehouse: { select: { name: true, isDefault: true } } },
+      orderBy: [{ warehouse: { isDefault: "desc" } }, { warehouse: { name: "asc" } }],
+    });
+    const allAvailable = allActiveInventories.reduce((sum, inventory) => sum + inventory.quantity, 0);
+    if (allAvailable >= requestedQuantity) {
+      inventories = allActiveInventories;
+      available = allAvailable;
+    }
+  }
+
+  // 3. If still insufficient in warehouseInventory, check variant.stock fallback
+  if (available < requestedQuantity) {
+    const variant = await tx.productVariant.findUnique({
+      where: { id: variantId },
+      select: { stock: true },
+    });
+
+    if (variant && variant.stock >= requestedQuantity) {
+      // Find or create default active warehouse
+      let defaultWarehouse = await tx.warehouse.findFirst({
+        where: { isActive: true },
+        orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
+      });
+
+      if (!defaultWarehouse) {
+        defaultWarehouse = await tx.warehouse.create({
+          data: {
+            code: "DEFAULT",
+            name: "Kho mặc định",
+            contactName: "AURIA Store",
+            phone: "0900000000",
+            address: "Kho trung tâm",
+            provinceId: "VN_1",
+            provinceName: "Thành phố Hồ Chí Minh",
+            districtId: "VN_1_1",
+            districtName: "Quận 1",
+            wardId: "VN_1_1_1",
+            wardName: "Phường Bến Nghé",
+            isDefault: true,
+            isActive: true,
+            isPickup: true,
+          },
+        });
+      }
+
+      // Upsert warehouse inventory record for this variant
+      const warehouseInv = await tx.warehouseInventory.upsert({
+        where: {
+          warehouseId_variantId: {
+            warehouseId: defaultWarehouse.id,
+            variantId,
+          },
+        },
+        update: {
+          quantity: { increment: variant.stock },
+        },
+        create: {
+          warehouseId: defaultWarehouse.id,
+          variantId,
+          quantity: variant.stock,
+        },
+      });
+
+      inventories = [{
+        ...warehouseInv,
+        warehouse: { name: defaultWarehouse.name, isDefault: defaultWarehouse.isDefault },
+      }];
+      available = warehouseInv.quantity;
+    }
+  }
+
+  if (available < requestedQuantity) {
+    throw new Error(`Rất tiếc, sản phẩm này chỉ còn ${available} sản phẩm trong kho.`);
   }
 
   let remaining = requestedQuantity;

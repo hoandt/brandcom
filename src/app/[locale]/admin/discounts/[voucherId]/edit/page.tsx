@@ -11,8 +11,10 @@ import { toast } from "sonner";
 import { useLocale } from "next-intl";
 
 interface VoucherBenefit {
-  scope: "cart" | "shipping";
+  scope: "cart" | "shipping" | "payment";
   type: "fixed_amount" | "percentage" | "free_shipping";
+  paymentMethod?: string;
+  isAutomatic?: boolean;
   value?: number;
   maxDiscountAmount?: number;
   canCombine?: boolean;
@@ -73,8 +75,10 @@ export default function AdminEditVoucherPage() {
   const [usagePerCustomer, setUsagePerCustomer] = useState("");
 
   // Benefit states
-  const [scope, setScope] = useState<"cart" | "shipping">("cart");
+  const [scope, setScope] = useState<"cart" | "shipping" | "payment">("cart");
   const [type, setType] = useState<"fixed_amount" | "percentage" | "free_shipping">("fixed_amount");
+  const [paymentMethod, setPaymentMethod] = useState("all_online");
+  const [isAutomatic, setIsAutomatic] = useState(true);
   const [benefitValue, setBenefitValue] = useState("");
   const [maxDiscountAmount, setMaxDiscountAmount] = useState("");
   const [canCombine, setCanCombine] = useState(false);
@@ -125,6 +129,8 @@ export default function AdminEditVoucherPage() {
       const benefit = v.benefit;
       setScope(benefit.scope);
       setType(benefit.type);
+      if (benefit.paymentMethod) setPaymentMethod(benefit.paymentMethod);
+      if (typeof benefit.isAutomatic === "boolean") setIsAutomatic(benefit.isAutomatic);
       setBenefitValue(benefit.value ? String(benefit.value) : "");
       setMaxDiscountAmount(benefit.maxDiscountAmount ? String(benefit.maxDiscountAmount) : "");
       setCanCombine(benefit.canCombine === true);
@@ -146,10 +152,12 @@ export default function AdminEditVoucherPage() {
   );
 
   const handleScopeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value as "cart" | "shipping";
+    const val = e.target.value as "cart" | "shipping" | "payment";
     setScope(val);
     if (val === "cart") {
       setType("fixed_amount");
+    } else if (val === "payment") {
+      setType("percentage");
     } else {
       setType("free_shipping");
     }
@@ -166,6 +174,10 @@ export default function AdminEditVoucherPage() {
     }
 
     const benefit: VoucherBenefit = { scope, type, canCombine };
+    if (scope === "payment") {
+      benefit.paymentMethod = paymentMethod;
+      benefit.isAutomatic = isAutomatic;
+    }
     if (type !== "free_shipping") {
       const val = Number(benefitValue);
       if (isNaN(val) || val <= 0) {
@@ -351,6 +363,7 @@ export default function AdminEditVoucherPage() {
               >
                 <option value="cart">Cart Subtotal</option>
                 <option value="shipping">Shipping Fee</option>
+                <option value="payment">Payment Method (Online/QR vs COD)</option>
               </select>
             </div>
 
@@ -370,6 +383,11 @@ export default function AdminEditVoucherPage() {
                     <option value="fixed_amount">Fixed Amount Discount</option>
                     <option value="percentage">Percentage Discount</option>
                   </>
+                ) : scope === "payment" ? (
+                  <>
+                    <option value="percentage">Percentage Discount (%)</option>
+                    <option value="fixed_amount">Fixed Amount Discount (đ)</option>
+                  </>
                 ) : (
                   <>
                     <option value="free_shipping">Free Shipping</option>
@@ -379,6 +397,36 @@ export default function AdminEditVoucherPage() {
               </select>
             </div>
           </div>
+
+          {scope === "payment" && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-border/40 pt-3">
+              <div className="grid gap-1.5">
+                <Label className="text-xs font-bold uppercase">Payment Method Target</Label>
+                <select
+                  className="h-9 px-3 border border-border bg-background outline-none text-sm w-full rounded-none"
+                  value={paymentMethod}
+                  onChange={(e) => setPaymentMethod(e.target.value)}
+                >
+                  <option value="all_online">All Online / QR Payments (Non-COD)</option>
+                  <option value="vnpay">VNPAY / VietQR</option>
+                  <option value="cod">Cash on Delivery (COD)</option>
+                </select>
+              </div>
+
+              <div className="flex flex-col justify-center gap-1">
+                <label className="flex items-center gap-2 cursor-pointer pt-2">
+                  <input
+                    type="checkbox"
+                    checked={isAutomatic}
+                    onChange={(e) => setIsAutomatic(e.target.checked)}
+                    className="h-4 w-4 accent-primary"
+                  />
+                  <span className="text-xs font-bold uppercase">Apply automatically</span>
+                </label>
+                <span className="text-[10px] text-muted-foreground">Applies automatically when customer selects this payment method at checkout.</span>
+              </div>
+            </div>
+          )}
 
           {type !== "free_shipping" && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

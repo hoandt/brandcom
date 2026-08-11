@@ -3,8 +3,10 @@ import { prisma } from "@/lib/prisma";
 import { DEFAULT_TENANT_ID } from "@/lib/store-settings";
 
 interface VoucherBenefit {
-  scope: "cart" | "shipping";
+  scope: "cart" | "shipping" | "payment";
   type: "fixed_amount" | "percentage" | "free_shipping";
+  paymentMethod?: string;
+  isAutomatic?: boolean;
   value?: number;
   maxDiscountAmount?: number;
   canCombine?: boolean;
@@ -121,7 +123,7 @@ export async function POST(req: Request) {
     let cartDiscountAmount = 0;
     let shippingDiscountAmount = 0;
 
-    if (benefit.scope === "cart") {
+    if (benefit.scope === "cart" || benefit.scope === "payment") {
       if (benefit.type === "fixed_amount") {
         cartDiscountAmount = Math.min(benefit.value ?? 0, subtotal);
       } else if (benefit.type === "percentage") {

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { omitShippingMappings } from "@/lib/location-sanitizer";
 
 // Haversine formula to compute spherical distance between two coordinates in kilometers
 function getHaversineDistance(
@@ -78,7 +79,7 @@ export async function GET(request: Request) {
         count: matches.length,
         radiusKm,
         target: { lat: targetLat, lng: targetLng },
-        data: matches,
+        data: omitShippingMappings(matches),
       });
     }
 
@@ -94,7 +95,14 @@ export async function GET(request: Request) {
       }
     );
     const data = await res.json();
-    return NextResponse.json(data);
+    if (data && typeof data === "object") {
+      if (Array.isArray(data.data)) {
+        data.data = omitShippingMappings(data.data);
+      } else if (Array.isArray(data)) {
+        return NextResponse.json(omitShippingMappings(data));
+      }
+    }
+    return NextResponse.json(omitShippingMappings(data));
   } catch (error) {
     console.error("Error fetching locations:", error);
     return NextResponse.json(

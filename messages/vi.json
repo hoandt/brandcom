@@ -183,7 +183,8 @@
     "resendIn": "Gửi lại sau {seconds} giây",
     "changePhone": "Đổi số điện thoại",
     "securityNote": "Mã chỉ có hiệu lực trong 5 phút và chỉ được sử dụng một lần.",
-    "passwordAlternative": "Hoặc đăng nhập bằng mật khẩu",
+    "passwordAlternative": "Đăng nhập bằng mật khẩu",
+    "zaloAlternative": "Đăng nhập bằng mã Zalo",
     "emailLogin": "Đăng nhập bằng email",
     "checkoutAction": "Đăng nhập bằng Zalo",
     "addressPrompt": "Đăng nhập bằng Zalo để chọn địa chỉ",
@@ -284,6 +285,27 @@
     "language": "Ngôn ngữ"
   },
   "Reviews": {
-    "eyebrow": "Ý kiến khách hàng", "title": "Đánh giá sản phẩm", "writeReview": "Viết đánh giá", "cancel": "Hủy", "rate": "Đánh giá {productName}", "headlinePlaceholder": "Tiêu đề đánh giá", "bodyPlaceholder": "Bạn thích hoặc chưa hài lòng điều gì? Sản phẩm vừa vặn và chất lượng ra sao?", "submit": "Gửi đánh giá", "submitting": "Đang gửi…", "submitError": "Không thể gửi đánh giá", "moderationNote": "Đánh giá sẽ được kiểm duyệt trước khi hiển thị.", "loadError": "Không thể tải đánh giá.", "globalRatings": "{count} lượt đánh giá", "mostHelpful": "Hữu ích nhất", "mostRecent": "Mới nhất", "empty": "Chưa có đánh giá. Hãy là người đầu tiên chia sẻ trải nghiệm.", "verifiedPurchase": "Đã mua hàng", "helpful": "Hữu ích", "signInToVote": "Đăng nhập để bình chọn", "signIn": "Đăng nhập", "previous": "Trước", "next": "Tiếp"
+    "eyebrow": "Ý kiến khách hàng",
+    "title": "Đánh giá sản phẩm",
+    "writeReview": "Viết đánh giá",
+    "cancel": "Hủy",
+    "rate": "Đánh giá {productName}",
+    "headlinePlaceholder": "Tiêu đề đánh giá",
+    "bodyPlaceholder": "Bạn thích hoặc chưa hài lòng điều gì? Sản phẩm vừa vặn và chất lượng ra sao?",
+    "submit": "Gửi đánh giá",
+    "submitting": "Đang gửi…",
+    "submitError": "Không thể gửi đánh giá",
+    "moderationNote": "Đánh giá sẽ được kiểm duyệt trước khi hiển thị.",
+    "loadError": "Không thể tải đánh giá.",
+    "globalRatings": "{count} lượt đánh giá",
+    "mostHelpful": "Hữu ích nhất",
+    "mostRecent": "Mới nhất",
+    "empty": "Chưa có đánh giá. Hãy là người đầu tiên chia sẻ trải nghiệm.",
+    "verifiedPurchase": "Đã mua hàng",
+    "helpful": "Hữu ích",
+    "signInToVote": "Đăng nhập để bình chọn",
+    "signIn": "Đăng nhập",
+    "previous": "Trước",
+    "next": "Tiếp"
   }
 }

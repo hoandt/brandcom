@@ -17,8 +17,10 @@ import { toast } from "sonner";
 import { useLocale } from "next-intl";
 
 interface VoucherBenefit {
-  scope: "cart" | "shipping";
+  scope: "cart" | "shipping" | "payment";
   type: "fixed_amount" | "percentage" | "free_shipping";
+  paymentMethod?: string;
+  isAutomatic?: boolean;
   value?: number;
   maxDiscountAmount?: number;
 }
@@ -139,6 +141,15 @@ export default function AdminDiscountsPage() {
       }
       if (benefit.type === "free_shipping") {
         return "Free shipping";
+      }
+    } else if (benefit.scope === "payment") {
+      const pmLabel = benefit.paymentMethod === "vnpay" ? "VNPAY/QR" : benefit.paymentMethod === "cod" ? "COD" : "Online/QR";
+      const autoLabel = benefit.isAutomatic !== false ? " (Tự động)" : "";
+      if (benefit.type === "fixed_amount") {
+        return `Giảm ${(benefit.value || 0).toLocaleString()} đ (${pmLabel})${autoLabel}`;
+      }
+      if (benefit.type === "percentage") {
+        return `Giảm ${benefit.value}% (${pmLabel})${autoLabel}`;
       }
     }
     return "N/A";

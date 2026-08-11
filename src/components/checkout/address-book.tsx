@@ -20,6 +20,7 @@ type AddressBookProps = {
     wardName: string;
     isDefault: boolean;
   } | null) => void;
+  selectedAddressId?: string | null;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   hasSelection?: boolean;
@@ -28,6 +29,7 @@ type AddressBookProps = {
 
 export function AddressBook({
   onSelectAddress,
+  selectedAddressId,
   open: externalOpen,
   onOpenChange: externalOnOpenChange,
   hasSelection,
@@ -91,6 +93,7 @@ export function AddressBook({
       <AddressBookModal
         isOpen={isOpen}
         onOpenChange={setIsOpen}
+        selectedAddressId={selectedAddressId}
         onSelectAddress={onSelectAddress}
       />
     </>

@@ -29,8 +29,20 @@ type SubmittedVariant = {
   imageUrl?: string | null;
 };
 
+let productsListCache: { data: any; timestamp: number } | null = null;
+const CACHE_TTL_MS = 30_000;
+
+export function invalidateProductsListCache() {
+  productsListCache = null;
+}
+
 export async function GET() {
   if (!(await authorized())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  if (productsListCache && Date.now() - productsListCache.timestamp < CACHE_TTL_MS) {
+    return NextResponse.json(productsListCache.data);
+  }
+
   const products = await prisma.product.findMany({
     include: {
       categories: { select: { id: true, name: true, slug: true, parentId: true } },
@@ -52,7 +64,9 @@ export async function GET() {
     },
     orderBy: { createdAt: "desc" },
   });
-  return NextResponse.json({ products });
+  const data = { products };
+  productsListCache = { data, timestamp: Date.now() };
+  return NextResponse.json(data);
 }
 
 const bulkDeleteSchema = z.object({
@@ -78,7 +92,10 @@ export async function DELETE(req: Request) {
       return { products: deletedProducts.count, variants: variants.count, inventories: inventories.count, images: images.count, reviews: reviews.count };
     });
 
-    revalidateTag("products");
+    if (process.env.NODE_ENV === "production") {
+      revalidateTag("products");
+    }
+    invalidateProductsListCache();
     return NextResponse.json({ success: true, deleted: result });
   } catch (error) {
     console.error("[BULK_DELETE_PRODUCTS_ERROR]", error);
@@ -135,26 +152,33 @@ export async function POST(req: Request) {
     }
     slug = uniqueSlug;
 
-    // Handle Image Uploads
-    const images = formData.getAll("images") as File[];
+    // Handle Image Uploads (support both pre-uploaded Cloudflare R2 string URLs and raw File objects)
+    const imagesEntries = formData.getAll("images");
+    const existingImagesEntries = formData.getAll("existingImages");
     const imageUrls: string[] = [];
 
-    for (const image of images) {
-      if (image && image.size > 0) {
-        const arrayBuffer = await image.arrayBuffer();
+    for (const entry of [...imagesEntries, ...existingImagesEntries]) {
+      if (typeof entry === "string" && entry.length > 0) {
+        imageUrls.push(entry);
+      } else if (entry && typeof entry === "object" && "size" in entry && (entry as File).size > 0) {
+        const file = entry as File;
+        const arrayBuffer = await file.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
-        const url = await uploadFileToR2(buffer, image.name, image.type);
+        const url = await uploadFileToR2(buffer, file.name, file.type);
         imageUrls.push(url);
       }
     }
 
-    // Process variant image files
+    // Process variant image files or pre-uploaded URLs
     for (let idx = 0; idx < variants.length; idx++) {
-      const variantImageFile = formData.get(`variantImage_${idx}`) as File;
-      if (variantImageFile && variantImageFile.size > 0) {
-        const arrayBuffer = await variantImageFile.arrayBuffer();
+      const variantImageEntry = formData.get(`variantImage_${idx}`);
+      if (typeof variantImageEntry === "string" && variantImageEntry.length > 0) {
+        variants[idx].imageUrl = variantImageEntry;
+      } else if (variantImageEntry && typeof variantImageEntry === "object" && "size" in variantImageEntry && (variantImageEntry as File).size > 0) {
+        const file = variantImageEntry as File;
+        const arrayBuffer = await file.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
-        const url = await uploadFileToR2(buffer, variantImageFile.name, variantImageFile.type);
+        const url = await uploadFileToR2(buffer, file.name, file.type);
         variants[idx].imageUrl = url;
       }
     }
@@ -214,7 +238,10 @@ export async function POST(req: Request) {
       },
     });
 
-    revalidateTag("products");
+    if (process.env.NODE_ENV === "production") {
+      revalidateTag("products");
+    }
+    invalidateProductsListCache();
     return NextResponse.json(product);
   } catch (error) {
     console.error("[CREATE_PRODUCT_API_ERROR]", error);

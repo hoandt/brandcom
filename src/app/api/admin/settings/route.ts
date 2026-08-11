@@ -1,6 +1,6 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { DEFAULT_TENANT_ID, getStoreSettings } from "@/lib/store-settings";
+import { DEFAULT_TENANT_ID, getStoreSettings, invalidateStoreSettingsCache } from "@/lib/store-settings";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { isAdminEmail } from "@/lib/admin-access";
@@ -17,6 +17,9 @@ const schema = z.object({
   orderPrefix: z.string().trim().min(1).max(12).regex(/^[A-Za-z0-9_-]+$/).transform((value) => value.toUpperCase()),
   fallbackShippingFee: z.number().int().min(0),
   lowStockThreshold: z.number().int().min(0),
+  nonCodDiscountEnabled: z.boolean().default(true),
+  nonCodDiscountType: z.enum(["percentage", "fixed_amount"]).default("percentage"),
+  nonCodDiscountValue: z.number().min(0).default(5),
   marketplaceShopId: z.union([
     z.string().trim().regex(/^\d+$/, "Marketplace Shop ID must contain digits only").max(30),
     z.literal(""),
@@ -39,7 +42,9 @@ async function authorize() {
 export async function GET() {
   if (!(await authorize())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const settings = await getStoreSettings();
-  const storedEmails = Array.isArray(settings.orderNotificationEmails) ? settings.orderNotificationEmails.filter((email): email is string => typeof email === "string") : [];
+  const storedEmails = Array.isArray(settings.orderNotificationEmails)
+    ? (settings.orderNotificationEmails as unknown[]).filter((email: unknown): email is string => typeof email === "string")
+    : [];
   const fallbackEmail = settings.orderNotificationEmail || process.env.ORDER_NOTIFICATION_EMAIL || process.env.SMTP_USER || null;
   return NextResponse.json({ settings: { ...settings, orderNotificationEmail: fallbackEmail, orderNotificationEmails: storedEmails.length > 0 ? storedEmails : fallbackEmail ? [fallbackEmail] : [] } });
 }
@@ -56,6 +61,7 @@ export async function PUT(request: Request) {
       update: { ...data, marketplaceShopId, orderNotificationEmail },
       create: { ...data, marketplaceShopId, orderNotificationEmail, tenantId: DEFAULT_TENANT_ID },
     });
+    invalidateStoreSettingsCache();
     return NextResponse.json({ settings });
   } catch (error) {
     if (error instanceof z.ZodError) return NextResponse.json({ error: "Invalid settings", issues: error.errors }, { status: 400 });

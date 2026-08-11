@@ -26,6 +26,9 @@ model StoreSettings {
   orderPrefix              String   @default("ORD")
   fallbackShippingFee      Int      @default(30000)
   lowStockThreshold        Int      @default(5)
+  nonCodDiscountEnabled    Boolean  @default(true)
+  nonCodDiscountType       String   @default("percentage")
+  nonCodDiscountValue      Float    @default(5)
   marketplaceShopId        String?
   marketplaceShops         Json     @default("[]")
   orderNotificationEnabled Boolean  @default(true)
@@ -143,6 +146,11 @@ model Order {
   customerPhone    String
   customerEmail    String?
   address          String
+  province         String?
+  district         String?
+  ward             String?
+  shippingCarrier  String?
+  shippingParams   Json?
   subtotal         Decimal
   shippingFee      Decimal
   discount         Decimal     @default(0)
@@ -459,3 +467,21 @@ model VoucherUsage {
   @@index([tenantId, voucherId])
   @@index([customerId])
 }
+
+model ShippingRateCache {
+  id          String   @id @default(cuid())
+  carrier     String
+  province    String
+  district    String
+  ward        String
+  weightBand  Float    @default(1.0)
+  fee         Int
+  serviceType Int      @default(1)
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([carrier, province, district, ward, weightBand])
+  @@index([carrier, province, district, ward, weightBand])
+}
+

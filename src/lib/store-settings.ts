@@ -15,6 +15,9 @@ export const DEFAULT_STORE_SETTINGS = {
   orderPrefix: process.env.DEFAULT_ORDER_PREFIX || "ORD",
   fallbackShippingFee: Number(process.env.DEFAULT_SHIPPING_FEE || 30000),
   lowStockThreshold: Number(process.env.DEFAULT_LOW_STOCK_THRESHOLD || 5),
+  nonCodDiscountEnabled: true,
+  nonCodDiscountType: "percentage",
+  nonCodDiscountValue: 5,
   marketplaceShopId: process.env.DEFAULT_MARKETPLACE_SHOP_ID || null,
   marketplaceShops: process.env.DEFAULT_MARKETPLACE_SHOP_ID
     ? [{ marketplace: "shopee", shopId: process.env.DEFAULT_MARKETPLACE_SHOP_ID }]
@@ -26,16 +29,38 @@ export const DEFAULT_STORE_SETTINGS = {
     : process.env.SMTP_USER ? [process.env.SMTP_USER] : [],
 };
 
+let cachedSettings: { data: any; expiresAt: number } | null = null;
+const CACHE_TTL_MS = 5 * 60_000; // 5 minutes in-memory cache
+
+export function invalidateStoreSettingsCache() {
+  cachedSettings = null;
+}
+
 export async function getStoreSettings(tenantId = DEFAULT_TENANT_ID) {
-  return prisma.storeSettings.upsert({
+  const now = Date.now();
+  if (cachedSettings && cachedSettings.expiresAt > now && cachedSettings.data.tenantId === tenantId) {
+    return cachedSettings.data;
+  }
+
+  let settings = await prisma.storeSettings.findUnique({
     where: { tenantId },
-    update: {},
-    create: { ...DEFAULT_STORE_SETTINGS, tenantId },
   });
+
+  if (!settings) {
+    settings = await prisma.storeSettings.upsert({
+      where: { tenantId },
+      update: {},
+      create: { ...DEFAULT_STORE_SETTINGS, tenantId },
+    });
+  }
+
+  cachedSettings = { data: settings, expiresAt: now + CACHE_TTL_MS };
+  return settings;
 }
 
 export type PublicStoreSettings = Pick<
   Awaited<ReturnType<typeof getStoreSettings>>,
   "tenantId" | "storeName" | "legalName" | "tagline" | "supportEmail" | "supportPhone" |
-  "defaultLocale" | "currency" | "timezone" | "orderPrefix" | "fallbackShippingFee" | "lowStockThreshold"
+  "defaultLocale" | "currency" | "timezone" | "orderPrefix" | "fallbackShippingFee" | "lowStockThreshold" |
+  "nonCodDiscountEnabled" | "nonCodDiscountType" | "nonCodDiscountValue"
 >;

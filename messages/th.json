@@ -184,6 +184,7 @@
     "changePhone": "เปลี่ยนหมายเลขโทรศัพท์",
     "securityNote": "รหัสมีอายุ 5 นาทีและใช้ได้เพียงครั้งเดียว",
     "passwordAlternative": "หรือเข้าสู่ระบบด้วยรหัสผ่าน",
+    "zaloAlternative": "หรือเข้าสู่ระบบด้วยรหัส Zalo",
     "emailLogin": "เข้าสู่ระบบด้วยอีเมล",
     "checkoutAction": "เข้าสู่ระบบด้วย Zalo",
     "addressPrompt": "เข้าสู่ระบบด้วย Zalo เพื่อเลือกที่อยู่",

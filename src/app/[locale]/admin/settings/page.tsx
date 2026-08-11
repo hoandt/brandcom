@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BellRing, Building2, ChevronRight, Globe2, Loader2, PackageCheck, Plus, Save, Store, Trash2, Truck } from "lucide-react";
+import { Banknote, BellRing, Building2, ChevronRight, Globe2, Loader2, PackageCheck, Plus, Save, Store, Trash2, Truck } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +13,8 @@ type Settings = {
   tenantId: string; storeName: string; legalName: string | null; tagline: string | null;
   supportEmail: string | null; supportPhone: string | null; defaultLocale: "vi" | "en" | "th";
   currency: string; timezone: string; orderPrefix: string; fallbackShippingFee: number;
-  lowStockThreshold: number; marketplaceShopId: string | null;
+  lowStockThreshold: number; nonCodDiscountEnabled: boolean; nonCodDiscountType: "percentage" | "fixed_amount";
+  nonCodDiscountValue: number; marketplaceShopId: string | null;
   marketplaceShops: { marketplace: "shopee" | "lazada" | "tiktok_shop"; shopId: string }[];
   orderNotificationEnabled: boolean; orderNotificationEmail: string | null;
   orderNotificationEmails: string[];
@@ -22,7 +23,8 @@ type Settings = {
 const emptySettings: Settings = {
   tenantId: "", storeName: "", legalName: "", tagline: "", supportEmail: "", supportPhone: "",
   defaultLocale: "vi", currency: "VND", timezone: "Asia/Ho_Chi_Minh", orderPrefix: "ORD",
-  fallbackShippingFee: 30000, lowStockThreshold: 5, marketplaceShopId: null, marketplaceShops: [],
+  fallbackShippingFee: 30000, lowStockThreshold: 5, nonCodDiscountEnabled: true, nonCodDiscountType: "percentage",
+  nonCodDiscountValue: 5, marketplaceShopId: null, marketplaceShops: [],
   orderNotificationEnabled: true, orderNotificationEmail: null,
   orderNotificationEmails: [],
 };
@@ -31,6 +33,7 @@ const settingsSections = [
   { id: "identity", label: "Store identity", icon: Building2 },
   { id: "regional", label: "Regional", icon: Globe2 },
   { id: "orders", label: "Orders & inventory", icon: PackageCheck },
+  { id: "payment-discount", label: "Payment discount", icon: Banknote },
   { id: "notifications", label: "Notifications", icon: BellRing },
   { id: "marketplace", label: "Marketplace", icon: Store },
   { id: "shipping", label: "Shipping", icon: Truck },
@@ -135,6 +138,39 @@ export default function AdminSettingsPage() {
       <SettingsSection id="orders" icon={PackageCheck} title="Orders and inventory" description="Operational defaults used by order numbering and inventory alerts.">
         <Field label="Order prefix"><Input required value={form.orderPrefix} onChange={(event) => setForm({ ...form, orderPrefix: event.target.value.toUpperCase() })} /></Field>
         <Field label="Low-stock threshold"><Input type="number" min="0" value={form.lowStockThreshold} onChange={(event) => setForm({ ...form, lowStockThreshold: Number(event.target.value) })} /></Field>
+      </SettingsSection>
+
+      <SettingsSection id="payment-discount" icon={Banknote} title="Online payment discount (Discourage COD)" description="Offer an automatic discount when customers choose QR payment / VNPAY instead of Cash on Delivery.">
+        <div className="flex min-h-12 items-center justify-between gap-4 border px-4 py-3 md:col-span-2">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wider">Enable Non-COD Discount</p>
+            <p className="mt-1 text-[10px] text-muted-foreground">Automatically apply a discount when customers pay online (QR Payment / VietQR / VNPAY) instead of COD.</p>
+          </div>
+          <input
+            type="checkbox"
+            checked={form.nonCodDiscountEnabled}
+            onChange={(event) => setForm({ ...form, nonCodDiscountEnabled: event.target.checked })}
+            className="h-5 w-5 accent-primary"
+          />
+        </div>
+        <Field label="Discount type">
+          <Select
+            value={form.nonCodDiscountType}
+            onChange={(value) => setForm({ ...form, nonCodDiscountType: value as Settings["nonCodDiscountType"] })}
+          >
+            <option value="percentage">Percentage (%)</option>
+            <option value="fixed_amount">Fixed Amount (VND)</option>
+          </Select>
+        </Field>
+        <Field label={form.nonCodDiscountType === "percentage" ? "Discount value (%)" : "Discount value (VND)"}>
+          <Input
+            type="number"
+            min="0"
+            step={form.nonCodDiscountType === "percentage" ? "0.5" : "1000"}
+            value={form.nonCodDiscountValue}
+            onChange={(event) => setForm({ ...form, nonCodDiscountValue: Number(event.target.value) })}
+          />
+        </Field>
       </SettingsSection>
 
       <SettingsSection id="notifications" icon={BellRing} title="Admin notifications" description="Internal alerts for store administrators. Customer notifications will be handled separately through Zalo later.">

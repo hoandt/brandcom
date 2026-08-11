@@ -15,11 +15,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ prod
   const page = Math.max(1, Number(searchParams.get("page")) || 1);
   const sort = searchParams.get("sort") === "recent" ? "recent" : "helpful";
   const take = 6;
-  const session = await auth();
+
+  const cookieHeader = request.headers.get("cookie") || "";
+  const hasAuthCookie = cookieHeader.includes("session-token") || cookieHeader.includes("auth");
+  const session = hasAuthCookie ? await auth() : null;
   const viewerId = session?.user?.id;
 
   const where = { productId, status: "APPROVED" as const };
-  const [reviews, allRatings] = await prisma.$transaction([
+  const [reviews, ratingGroups] = await Promise.all([
     prisma.productReview.findMany({
       where,
       select: {
@@ -39,24 +42,36 @@ export async function GET(request: Request, { params }: { params: Promise<{ prod
       skip: (page - 1) * take,
       take,
     }),
-    prisma.productReview.findMany({ where, select: { rating: true } }),
+    prisma.productReview.groupBy({
+      by: ["rating"],
+      where,
+      _count: { _all: true },
+    }),
   ]);
 
   const distribution = Object.fromEntries([1, 2, 3, 4, 5].map((rating) => [rating, 0]));
-  for (const review of allRatings) distribution[review.rating] += 1;
-  const total = allRatings.length;
-  const ratingSum = allRatings.reduce((sum, review) => sum + review.rating, 0);
+  let total = 0;
+  let ratingSum = 0;
+  for (const group of ratingGroups) {
+    const count = group._count._all;
+    distribution[group.rating] = count;
+    total += count;
+    ratingSum += group.rating * count;
+  }
 
-  return NextResponse.json({
-    reviews: reviews.map(({ helpfulVotes, _count, user, ...review }) => ({
-      ...review,
-      authorName: user.name?.trim() || "Customer",
-      helpfulCount: _count.helpfulVotes,
-      viewerFoundHelpful: Boolean(viewerId && helpfulVotes.some((vote) => vote.userId === viewerId)),
-    })),
-    summary: { total, average: total ? ratingSum / total : 0, distribution },
-    pagination: { page, pageCount: Math.ceil(total / take) },
-  });
+  return NextResponse.json(
+    {
+      reviews: reviews.map(({ helpfulVotes, _count, user, ...review }) => ({
+        ...review,
+        authorName: user.name?.trim() || "Customer",
+        helpfulCount: _count.helpfulVotes,
+        viewerFoundHelpful: Boolean(viewerId && helpfulVotes.some((vote) => vote.userId === viewerId)),
+      })),
+      summary: { total, average: total ? ratingSum / total : 0, distribution },
+      pagination: { page, pageCount: Math.ceil(total / take) },
+    },
+    { headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" } }
+  );
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ productId: string }> }) {

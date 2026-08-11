@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getStoreSettings } from "@/lib/store-settings";
+import { omitShippingMappings } from "@/lib/location-sanitizer";
 
 type LocationRecord = {
   location_id: string;
@@ -240,9 +241,9 @@ export async function GET(request: Request) {
       data: {
         provinceName: finalProvince.name,
         wardName: finalWard.name,
-        province: finalProvince,
-        district: finalDistrict,
-        ward: finalWard,
+        province: omitShippingMappings(finalProvince),
+        district: omitShippingMappings(finalDistrict),
+        ward: omitShippingMappings(finalWard),
         source: osm ? "osm" : "swifthub",
       },
     });

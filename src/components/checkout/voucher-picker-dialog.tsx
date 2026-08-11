@@ -215,7 +215,7 @@ export function VoucherPickerDialog({
   const [error, setError] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const { data: vouchers = [], isLoading } = useQuery<ActiveVoucher[]>({
+  const { data: rawVouchers, isLoading } = useQuery<{ vouchers: ActiveVoucher[] } | ActiveVoucher[]>({
     queryKey: ["active-vouchers"],
     queryFn: async () => {
       const response = await fetch("/api/vouchers/active");
@@ -228,6 +228,12 @@ export function VoucherPickerDialog({
     refetchOnWindowFocus: false,
   });
 
+  const vouchersList: ActiveVoucher[] = Array.isArray(rawVouchers)
+    ? rawVouchers
+    : Array.isArray((rawVouchers as any)?.vouchers)
+    ? (rawVouchers as any).vouchers
+    : [];
+
   useEffect(() => {
     if (open) {
       setSelectedCode(null);
@@ -236,8 +242,8 @@ export function VoucherPickerDialog({
     setError("");
   }, [open]);
 
-  const shippingVouchers = vouchers.filter((v) => v.benefit.scope === "shipping");
-  const discountVouchers = vouchers.filter((v) => v.benefit.scope === "cart");
+  const shippingVouchers = vouchersList.filter((v) => v.benefit?.scope === "shipping");
+  const discountVouchers = vouchersList.filter((v) => v.benefit?.scope === "cart");
 
   const isAppliedFn = (code: string) => appliedCoupons.some((c) => c.code === code);
   const isCombinationBlocked = (v: ActiveVoucher) =>

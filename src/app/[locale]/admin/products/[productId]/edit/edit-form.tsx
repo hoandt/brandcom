@@ -135,10 +135,12 @@ export default function EditProductForm({ initialData }: EditProductFormProps) {
   const [cardHoverVideoUrl, setCardHoverVideoUrl] = useState(initialData.cardHoverVideoUrl)
   const [cardHoverVideoFile, setCardHoverVideoFile] = useState<File | null>(null)
   const [cardHoverVideoPreview, setCardHoverVideoPreview] = useState("")
+  const [isUploadingVideo, setIsUploadingVideo] = useState(false)
   const [cardHoverImageUrl, setCardHoverImageUrl] = useState(initialData.cardHoverImageUrl)
   const [categoryIds, setCategoryIds] = useState<string[]>(initialData.categoryIds)
 
   const [existingImages, setExistingImages] = useState<string[]>(initialData.images)
+  const [isUploadingGallery, setIsUploadingGallery] = useState(false)
   const [newImages, setNewImages] = useState<File[]>([])
   const [newImagePreviews, setNewImagePreviews] = useState<string[]>([])
   const [mainImageKey, setMainImageKey] = useState<string | null>(
@@ -242,14 +244,38 @@ export default function EditProductForm({ initialData }: EditProductFormProps) {
     }
   }, [name, isSlugManuallyEdited]);
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
       const selectedFiles = Array.from(e.target.files);
-      setNewImages((prev) => [...prev, ...selectedFiles]);
-
-      const previews = selectedFiles.map((file) => URL.createObjectURL(file));
-      setNewImagePreviews((prev) => [...prev, ...previews]);
-      if (!mainImageKey && previews[0]) setMainImageKey(`new:${previews[0]}`);
+      setIsUploadingGallery(true);
+      try {
+        const uploadedUrls: string[] = [];
+        for (const file of selectedFiles) {
+          const formData = new FormData();
+          formData.append("file", file);
+          const res = await fetch("/api/admin/upload", {
+            method: "POST",
+            body: formData,
+          });
+          if (!res.ok) throw new Error("Failed to upload image");
+          const data = await res.json();
+          if (data.url) {
+            uploadedUrls.push(data.url);
+          }
+        }
+        setExistingImages((prev) => {
+          const updated = [...prev, ...uploadedUrls];
+          if (!mainImageKey && updated[0]) {
+            setMainImageKey(`existing:${updated[0]}`);
+          }
+          return updated;
+        });
+      } catch (err) {
+        alert("Failed to upload image to Cloudflare R2");
+      } finally {
+        setIsUploadingGallery(false);
+        e.target.value = "";
+      }
     }
   };
 
@@ -335,13 +361,28 @@ export default function EditProductForm({ initialData }: EditProductFormProps) {
     });
   };
 
-  // Handle variant image picker
-  const handleVariantImageChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle variant image picker with Cloudflare R2 upload
+  const handleVariantImageChange = async (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      const preview = URL.createObjectURL(file);
-      handleVariantChange(index, "imageFile", file);
-      handleVariantChange(index, "imagePreview", preview);
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        const res = await fetch("/api/admin/upload", {
+          method: "POST",
+          body: formData,
+        });
+        if (!res.ok) throw new Error("Upload failed");
+        const data = await res.json();
+        if (data.url) {
+          handleVariantChange(index, "imageUrl", data.url);
+          handleVariantChange(index, "imagePreview", data.url);
+        }
+      } catch (err) {
+        alert("Failed to upload variant image to Cloudflare R2");
+      } finally {
+        e.target.value = "";
+      }
     }
   };
 
@@ -792,7 +833,50 @@ export default function EditProductForm({ initialData }: EditProductFormProps) {
             <div className="grid gap-2 border p-3">
               <Label htmlFor="cardHoverVideoUrl" className="text-[10px] font-bold uppercase tracking-wider">Hover video</Label>
               <Input id="cardHoverVideoUrl" type="url" value={cardHoverVideoUrl} onChange={(event) => { setCardHoverVideoUrl(event.target.value); setCardHoverVideoFile(null); setCardHoverVideoPreview(""); }} placeholder="https://…/product-hover.mp4" className="h-10 rounded-none text-xs" />
-              <div className="relative flex h-10 items-center justify-center border border-dashed text-[10px] text-muted-foreground"><input type="file" accept="video/mp4,video/webm" className="absolute inset-0 cursor-pointer opacity-0" onChange={(event) => { const file = event.target.files?.[0] ?? null; setCardHoverVideoFile(file); if (cardHoverVideoPreview) URL.revokeObjectURL(cardHoverVideoPreview); setCardHoverVideoPreview(file ? URL.createObjectURL(file) : ""); }} />{cardHoverVideoFile ? cardHoverVideoFile.name : "Or upload MP4/WebM · max 25 MB"}</div>
+              <div className="relative flex h-10 items-center justify-center border border-dashed text-[10px] text-muted-foreground">
+                <input
+                  type="file"
+                  accept="video/mp4,video/webm"
+                  className="absolute inset-0 cursor-pointer opacity-0"
+                  disabled={isUploadingVideo}
+                  onChange={async (event) => {
+                    const file = event.target.files?.[0] ?? null;
+                    if (!file) return;
+                    setIsUploadingVideo(true);
+                    try {
+                      const formData = new FormData();
+                      formData.append("file", file);
+                      const res = await fetch("/api/admin/upload", {
+                        method: "POST",
+                        body: formData,
+                      });
+                      if (!res.ok) throw new Error("Upload failed");
+                      const data = await res.json();
+                      if (data.url) {
+                        setCardHoverVideoUrl(data.url);
+                        setCardHoverVideoFile(null);
+                        if (cardHoverVideoPreview) URL.revokeObjectURL(cardHoverVideoPreview);
+                        setCardHoverVideoPreview("");
+                      }
+                    } catch (err) {
+                      alert("Failed to upload video to Cloudflare R2");
+                    } finally {
+                      setIsUploadingVideo(false);
+                      event.target.value = "";
+                    }
+                  }}
+                />
+                {isUploadingVideo ? (
+                  <span className="flex items-center gap-2 text-primary font-bold">
+                    <span className="w-3 h-3 border-2 border-primary border-r-transparent rounded-full animate-spin" />
+                    Uploading video to Cloudflare...
+                  </span>
+                ) : cardHoverVideoFile ? (
+                  cardHoverVideoFile.name
+                ) : (
+                  "Or upload MP4/WebM to Cloudflare · max 25 MB"
+                )}
+              </div>
               {(cardHoverVideoPreview || cardHoverVideoUrl) && <video src={cardHoverVideoPreview || cardHoverVideoUrl} muted loop playsInline controls className="aspect-video w-full border bg-black object-cover" />}
               {(cardHoverVideoPreview || cardHoverVideoUrl) && <Button type="button" variant="outline" className="h-8 rounded-none text-[10px]" onClick={() => { if (cardHoverVideoPreview) URL.revokeObjectURL(cardHoverVideoPreview); setCardHoverVideoPreview(""); setCardHoverVideoFile(null); setCardHoverVideoUrl(""); }}>Remove video</Button>}
             </div>
@@ -816,11 +900,12 @@ export default function EditProductForm({ initialData }: EditProductFormProps) {
           {existingImages.length > 0 && (
             <div className="mb-3">
               <h3 className="text-[10px] uppercase tracking-widest text-muted-foreground mb-2 font-bold">Active Images</h3>
-              <div className="grid grid-cols-4 sm:grid-cols-6 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                 {existingImages.map((url, index) => {
                   const isMainImage = mainImageKey === `existing:${url}`;
+                  const isSecondaryImage = cardHoverImageUrl ? cardHoverImageUrl === url : (index === 1 && existingImages.length > 1);
                   return (
-                  <div key={url} className={`relative group overflow-hidden border aspect-square bg-muted ${isMainImage ? "border-2 border-primary" : "border-border"}`}>
+                  <div key={url} className={`relative group overflow-hidden border aspect-square bg-muted ${isMainImage ? "ring-2 ring-primary border-primary" : isSecondaryImage ? "ring-2 ring-neutral-800 dark:ring-neutral-200 border-neutral-800 dark:border-neutral-200" : "border-border"}`}>
                     <img
                       src={url}
                       alt={`Product ${index + 1}`}
@@ -829,19 +914,31 @@ export default function EditProductForm({ initialData }: EditProductFormProps) {
                     <button
                       type="button"
                       onClick={() => removeExistingImage(url)}
-                      className="absolute top-1 right-1 bg-destructive text-destructive-foreground p-0.5 rounded-none text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute top-1 right-1 bg-destructive text-destructive-foreground w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                      title="Remove image"
                     >
                       ✕
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setMainImageKey(`existing:${url}`)}
-                      className={`absolute bottom-1 left-1 flex h-7 items-center gap-1 border px-2 text-[9px] font-bold uppercase tracking-wider transition-colors ${isMainImage ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background/95 text-foreground sm:opacity-0 sm:group-hover:opacity-100"}`}
-                      aria-label={isMainImage ? "Main product image" : `Set image ${index + 1} as main`}
-                    >
-                      <Star className="h-3 w-3" fill={isMainImage ? "currentColor" : "none"} />
-                      {isMainImage ? "Main" : "Set main"}
-                    </button>
+                    <div className="absolute bottom-1.5 left-1.5 right-1.5 flex items-center justify-between gap-1 z-10">
+                      <button
+                        type="button"
+                        onClick={() => setMainImageKey(`existing:${url}`)}
+                        className={`flex h-6 items-center gap-1 border px-1.5 text-[9px] font-bold uppercase tracking-wider transition-colors ${isMainImage ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background/90 text-foreground hover:bg-background"}`}
+                        aria-label={isMainImage ? "Main product image" : `Set image ${index + 1} as main`}
+                      >
+                        <Star className="h-2.5 w-2.5" fill={isMainImage ? "currentColor" : "none"} />
+                        {isMainImage ? "Main" : "Main"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCardHoverImageUrl(cardHoverImageUrl === url ? "" : url)}
+                        className={`flex h-6 items-center gap-1 border px-1.5 text-[9px] font-bold uppercase tracking-wider transition-colors ${isSecondaryImage ? "border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900" : "border-border bg-background/90 text-foreground hover:bg-background"}`}
+                        aria-label={isSecondaryImage ? "Secondary product image" : `Set image ${index + 1} as secondary`}
+                      >
+                        <Star className="h-2.5 w-2.5" fill={isSecondaryImage ? "currentColor" : "none"} />
+                        {isSecondaryImage ? "Secondary" : "Secondary"}
+                      </button>
+                    </div>
                   </div>
                   );
                 })}
@@ -856,12 +953,20 @@ export default function EditProductForm({ initialData }: EditProductFormProps) {
               name="images"
               multiple
               accept="image/*"
+              disabled={isUploadingGallery}
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               onChange={handleImageChange}
             />
-            <p className="text-xs text-muted-foreground">
-              Drag &amp; drop new images here or <span className="text-primary font-medium hover:underline">browse</span>
-            </p>
+            {isUploadingGallery ? (
+              <p className="text-xs font-bold text-primary flex items-center justify-center gap-2">
+                <span className="w-3.5 h-3.5 border-2 border-primary border-r-transparent rounded-full animate-spin" />
+                Uploading images to Cloudflare R2...
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Drag &amp; drop new images here or <span className="text-primary font-medium hover:underline">browse</span> (Uploaded directly to Cloudflare R2)
+              </p>
+            )}
           </div>
 
           {/* New Image Previews */}

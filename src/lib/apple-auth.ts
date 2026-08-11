@@ -1,6 +1,13 @@
 import * as jose from "jose";
 
+let cachedAppleSecret: { secret: string; expiresAt: number } | null = null;
+
 export async function getAppleClientSecret() {
+  const now = Date.now();
+  if (cachedAppleSecret && cachedAppleSecret.expiresAt > now) {
+    return cachedAppleSecret.secret;
+  }
+
   const teamId = process.env.APPLE_TEAM_ID;
   const clientId = process.env.NEXT_PUBLIC_APPLE_CLIENT_ID;
   const keyId = process.env.APPLE_KEY_ID;
@@ -23,8 +30,9 @@ export async function getAppleClientSecret() {
     .setIssuer(teamId)
     .setAudience("https://appleid.apple.com")
     .setSubject(clientId)
-    .setExpirationTime("180d") // Expires in 180 days (max 6 months allowed by Apple)
+    .setExpirationTime("180d")
     .sign(ecPrivateKey);
 
+  cachedAppleSecret = { secret, expiresAt: now + 24 * 60 * 60_000 };
   return secret;
 }

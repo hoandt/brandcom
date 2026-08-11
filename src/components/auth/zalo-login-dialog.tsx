@@ -6,7 +6,7 @@ import { useMutation } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Check,
-  ChevronDown,
+  KeyRound,
   Loader2,
   MessageCircleMore,
   Phone,
@@ -63,7 +63,7 @@ export function ZaloLoginDialog({
   const [step, setStep] = useState<"phone" | "otp">("phone");
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
-  const [passwordLoginExpanded, setPasswordLoginExpanded] = useState(false);
+  const [loginMode, setLoginMode] = useState<"zalo" | "password">("zalo");
   const [resendSeconds, setResendSeconds] = useState(0);
   const isPhoneValid = isValidVietnamesePhone(phone);
   const finishLogin = async () => {
@@ -84,7 +84,7 @@ export function ZaloLoginDialog({
     setStep("phone");
     setPhone("");
     setOtp("");
-    setPasswordLoginExpanded(false);
+    setLoginMode("zalo");
     setResendSeconds(0);
   }, [open]);
 
@@ -108,8 +108,6 @@ export function ZaloLoginDialog({
     },
     onSuccess: (data) => {
       setPhone(data.phone);
-      setOtp("");
-      setStep("otp");
       setResendSeconds(data.resendAfterSeconds);
     },
   });
@@ -142,6 +140,11 @@ export function ZaloLoginDialog({
 
   const submitPhone = (event: React.FormEvent) => {
     event.preventDefault();
+    if (!isPhoneValid) return;
+    setStep("otp");
+    setOtp("");
+    sendOtpMutation.reset();
+    verifyOtpMutation.reset();
     sendOtpMutation.mutate();
   };
 
@@ -152,6 +155,7 @@ export function ZaloLoginDialog({
 
   const resendOtp = () => {
     if (resendSeconds > 0 || sendOtpMutation.isPending) return;
+    sendOtpMutation.reset();
     sendOtpMutation.mutate();
   };
 
@@ -165,7 +169,19 @@ export function ZaloLoginDialog({
         showCloseButton={false}
       >
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
-          {step === "otp" ? (
+          {loginMode === "password" ? (
+            <button
+              type="button"
+              onClick={() => {
+                setLoginMode("zalo");
+                setStep("phone");
+              }}
+              className="flex h-9 w-9 items-center justify-center border border-border text-foreground transition-colors hover:bg-muted"
+              aria-label={t("zaloAlternative")}
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+          ) : step === "otp" ? (
             <button
               type="button"
               onClick={() => {
@@ -198,64 +214,96 @@ export function ZaloLoginDialog({
         <div className="p-5 sm:p-6">
           <DialogHeader className="mb-5 text-center">
             <div className="mx-auto mb-1 flex h-12 w-12 items-center justify-center border border-primary/20 bg-primary/[0.06] text-primary">
-              {step === "phone" ? (
+              {loginMode === "password" ? (
+                <KeyRound className="h-5 w-5" />
+              ) : step === "phone" ? (
                 <Phone className="h-5 w-5" />
               ) : (
                 <ShieldCheck className="h-5 w-5" />
               )}
             </div>
             <DialogTitle className="text-xl font-bold leading-tight">
-              {step === "phone"
-                ? t("title")
-                : t("otpTitle")}
+              {loginMode === "password"
+                ? t("passwordAlternative")
+                : step === "phone"
+                  ? t("title")
+                  : t("otpTitle")}
             </DialogTitle>
-
           </DialogHeader>
 
-          {step === "phone" ? (
-            <form onSubmit={submitPhone} className="space-y-3">
-              <label className="block space-y-1.5">
-                <span className="text-xs font-bold uppercase tracking-[0.08em] text-foreground/70">
-                  {t("phoneLabel")}
-                </span>
-                <Input
-                  value={phone}
-                  onChange={(event) => {
-                    setPhone(event.target.value);
-                    sendOtpMutation.reset();
+          {loginMode === "password" ? (
+            <div>
+              <PhonePasswordLoginForm onSuccess={finishLogin} />
+              <div className="mt-4 border-t border-border pt-3 text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLoginMode("zalo");
+                    setStep("phone");
                   }}
-                  type="tel"
-                  inputMode="tel"
-                  autoComplete="tel"
-                  placeholder={t("phonePlaceholder")}
-                  className="h-12 rounded-none text-base"
-                  aria-invalid={Boolean(errorMessage)}
-                  autoFocus
-                />
+                  className="text-xs font-semibold text-primary transition-colors hover:underline"
+                >
+                  {t("zaloAlternative")}
+                </button>
+              </div>
+            </div>
+          ) : step === "phone" ? (
+            <div>
+              <form onSubmit={submitPhone} className="space-y-3">
+                <label className="block space-y-1.5">
+                  <span className="text-xs font-bold uppercase tracking-[0.08em] text-foreground/70">
+                    {t("phoneLabel")}
+                  </span>
+                  <Input
+                    value={phone}
+                    onChange={(event) => {
+                      setPhone(event.target.value);
+                      sendOtpMutation.reset();
+                    }}
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    placeholder={t("phonePlaceholder")}
+                    className="h-12 rounded-none text-base"
+                    aria-invalid={Boolean(errorMessage)}
+                    autoFocus
+                  />
+                </label>
 
-              </label>
-
-              {errorMessage && (
-                <p className="border-l-2 border-destructive bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive">
-                  {errorMessage}
-                </p>
-              )}
-
-              <Button
-                type="submit"
-                className="h-12 w-full rounded-none font-bold"
-                disabled={sendOtpMutation.isPending || !isPhoneValid}
-              >
-                {sendOtpMutation.isPending ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {t("sending")}
-                  </>
-                ) : (
-                  t("sendCode")
+                {errorMessage && (
+                  <p className="border-l-2 border-destructive bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive">
+                    {errorMessage}
+                  </p>
                 )}
-              </Button>
-            </form>
+
+                <Button
+                  type="submit"
+                  className="h-12 w-full rounded-none font-bold"
+                  disabled={sendOtpMutation.isPending || !isPhoneValid}
+                >
+                  {sendOtpMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      {t("sending")}
+                    </>
+                  ) : (
+                    t("sendCode")
+                  )}
+                </Button>
+              </form>
+
+              {showPasswordLogin && (
+                <div className="mt-4 border-t border-border pt-3 text-center">
+                  <button
+                    type="button"
+                    onClick={() => setLoginMode("password")}
+                    className="text-xs font-semibold text-muted-foreground transition-colors hover:text-primary hover:underline"
+                  >
+                    {t("passwordAlternative")}
+                  </button>
+                </div>
+              )}
+            </div>
           ) : (
             <form onSubmit={submitOtp} className="space-y-3">
               <label className="block space-y-1.5">
@@ -270,9 +318,20 @@ export function ZaloLoginDialog({
                   }}
                   label={t("otpLabel")}
                   invalid={Boolean(errorMessage)}
-                  disabled={verifyOtpMutation.isPending}
+                  disabled={
+                    verifyOtpMutation.isPending ||
+                    sendOtpMutation.isPending ||
+                    sendOtpMutation.isError
+                  }
                 />
               </label>
+
+              {sendOtpMutation.isPending && (
+                <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                  {t("sending")}
+                </p>
+              )}
 
               {errorMessage && (
                 <p className="border-l-2 border-destructive bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive">
@@ -283,7 +342,12 @@ export function ZaloLoginDialog({
               <Button
                 type="submit"
                 className="h-12 w-full rounded-none font-bold"
-                disabled={verifyOtpMutation.isPending || otp.length !== 6}
+                disabled={
+                  verifyOtpMutation.isPending ||
+                  sendOtpMutation.isPending ||
+                  sendOtpMutation.isError ||
+                  otp.length !== 6
+                }
               >
                 {verifyOtpMutation.isPending ? (
                   <>
@@ -301,45 +365,29 @@ export function ZaloLoginDialog({
               <button
                 type="button"
                 onClick={resendOtp}
-                disabled={resendSeconds > 0 || sendOtpMutation.isPending}
+                disabled={
+                  (resendSeconds > 0 && !sendOtpMutation.isError) ||
+                  sendOtpMutation.isPending
+                }
                 className="w-full py-2 text-xs font-semibold text-primary disabled:text-muted-foreground"
               >
-                {resendSeconds > 0
-                  ? t("resendIn", { seconds: resendSeconds })
-                  : t("resend")}
+                {sendOtpMutation.isPending
+                  ? t("sending")
+                  : resendSeconds > 0 && !sendOtpMutation.isError
+                    ? t("resendIn", { seconds: resendSeconds })
+                    : t("resend")}
               </button>
             </form>
           )}
 
-          {step === "phone" && showPasswordLogin && (
-            <div className="mt-5 border-t border-border pt-5">
-              <button
-                type="button"
-                onClick={() =>
-                  setPasswordLoginExpanded((isExpanded) => !isExpanded)
-                }
-                className="flex h-12 w-full items-center justify-between border border-border px-4 text-xs font-bold uppercase tracking-widest text-foreground transition-colors hover:border-primary/40 hover:bg-muted/40"
-                aria-expanded={passwordLoginExpanded}
-              >
-                <span>{t("passwordAlternative")}</span>
-                <ChevronDown
-                  className={`h-4 w-4 shrink-0 transition-transform ${passwordLoginExpanded ? "rotate-180" : ""}`}
-                />
-              </button>
-              {passwordLoginExpanded && (
-                <div className="mt-4">
-                  <PhonePasswordLoginForm onSuccess={finishLogin} />
-                </div>
-              )}
+          {loginMode === "zalo" && (
+            <div className="mt-5 border-t border-border pt-4 text-center">
+              <p className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
+                <ShieldCheck className="h-3.5 w-3.5" />
+                {t("securityNote")}
+              </p>
             </div>
           )}
-
-          <div className="mt-5 border-t border-border pt-4 text-center">
-            <p className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
-              <ShieldCheck className="h-3.5 w-3.5" />
-              {t("securityNote")}
-            </p>
-          </div>
         </div>
       </DialogContent>
     </Dialog>

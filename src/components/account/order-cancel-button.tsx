@@ -43,10 +43,10 @@ export function OrderCancelButton({ orderId, cancelText, confirmText }: OrderCan
 
   return (
     <Button
-      variant="destructive"
+      variant="ghost"
       onClick={handleCancel}
       disabled={isLoading}
-      className="h-8 px-3 text-xs font-medium rounded-none"
+      className="h-8 px-3 text-xs font-medium rounded-none text-muted-foreground hover:bg-destructive/5  text-destructive"
     >
       {isLoading ? "..." : cancelText}
     </Button>

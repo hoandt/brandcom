@@ -25,13 +25,27 @@ async function authorized() {
   return isAdminEmail(session?.user?.email);
 }
 
+let categoriesCache: { data: any; timestamp: number } | null = null;
+const CACHE_TTL_MS = 60_000;
+
+export function invalidateCategoriesCache() {
+  categoriesCache = null;
+}
+
 export async function GET() {
   if (!(await authorized())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  if (categoriesCache && Date.now() - categoriesCache.timestamp < CACHE_TTL_MS) {
+    return NextResponse.json(categoriesCache.data);
+  }
+
   const categories = await prisma.category.findMany({
     orderBy: [{ position: "asc" }, { name: "asc" }],
     include: { _count: { select: { products: true, children: true } } },
   });
-  return NextResponse.json({ categories });
+  const data = { categories };
+  categoriesCache = { data, timestamp: Date.now() };
+  return NextResponse.json(data);
 }
 
 export async function POST(req: Request) {

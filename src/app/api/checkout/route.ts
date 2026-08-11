@@ -11,6 +11,15 @@ const checkoutSchema = z.object({
   customerPhone: z.string().min(1, "Phone number is required"),
   customerEmail: z.string().email("Invalid email address").optional().or(z.literal("")),
   address: z.string().min(1, "Address is required"),
+  location: z
+    .object({
+      province: z.any().optional(),
+      district: z.any().optional(),
+      ward: z.any().optional(),
+    })
+    .optional(),
+  shippingCarrier: z.string().optional(),
+  shippingParams: z.record(z.any()).optional(),
   paymentMethod: z.string().min(1, "Payment method is required"),
   subtotal: z.number().min(0),
   shippingFee: z.number().min(0),
@@ -140,10 +149,51 @@ export async function POST(req: Request) {
 
       // Cap discount to subtotal
       if (finalDiscount > validatedData.subtotal) finalDiscount = validatedData.subtotal;
-
-      finalTotalAmount = validatedData.subtotal + finalShippingFee - finalDiscount;
-      if (finalTotalAmount < 0) finalTotalAmount = 0;
     }
+
+    // Apply automatic payment method discounts created via /admin/discounts (scope: "payment")
+    const isCod = validatedData.paymentMethod === "Cash on Delivery" || validatedData.paymentMethod === "COD";
+    const now = new Date();
+
+    const activeVouchers = await prisma.voucher.findMany({
+      where: {
+        tenantId: TENANT_ID,
+        status: "active",
+        startsAt: { lte: now },
+        endsAt: { gte: now },
+      },
+    });
+
+    const matchingPaymentVoucher = activeVouchers.find((v) => {
+      const b = v.benefit as any;
+      if (!b || b.scope !== "payment") return false;
+      if (b.isAutomatic === false) return false;
+      if (v.totalUsageLimit !== null && v.consumedQuantity >= v.totalUsageLimit) return false;
+      if (v.minimumCartSubtotal !== null && validatedData.subtotal < v.minimumCartSubtotal) return false;
+
+      const pm = b.paymentMethod || "all_online";
+      if (pm === "all_online") return !isCod;
+      if (pm === "cod") return isCod;
+      if (pm === "vnpay") return validatedData.paymentMethod === "VNPAY" || !isCod;
+      return true;
+    });
+
+    if (matchingPaymentVoucher) {
+      const b = matchingPaymentVoucher.benefit as any;
+      let pmDisc = 0;
+      if (b.type === "percentage") {
+        pmDisc = Math.round((validatedData.subtotal * (b.value || 0)) / 100);
+        if (b.maxDiscountAmount) pmDisc = Math.min(pmDisc, b.maxDiscountAmount);
+      } else if (b.type === "fixed_amount") {
+        pmDisc = Math.min(validatedData.subtotal, b.value || 0);
+      }
+      finalDiscount += pmDisc;
+    }
+
+    if (finalDiscount > validatedData.subtotal) finalDiscount = validatedData.subtotal;
+
+    finalTotalAmount = validatedData.subtotal + finalShippingFee - finalDiscount;
+    if (finalTotalAmount < 0) finalTotalAmount = 0;
 
     // Execute checkout inside a single atomic Prisma transaction
     const order = await prisma.$transaction(async (tx) => {
@@ -167,7 +217,35 @@ export async function POST(req: Request) {
         }
       }
 
-      // 2. Create the order and persist the exact warehouse allocation per item.
+      // 2. Extract shipping location and parameters, then create the order.
+      const locationName = (val: unknown) =>
+        typeof val === "string"
+          ? val.trim()
+          : (val as { name?: unknown } | null | undefined)?.name &&
+              typeof (val as { name: string }).name === "string"
+            ? (val as { name: string }).name.trim()
+            : null;
+
+      const province = locationName(validatedData.location?.province);
+      const district = locationName(validatedData.location?.district);
+      const ward = locationName(validatedData.location?.ward);
+
+      const defaultShippingParams = {
+        carrier: validatedData.shippingCarrier || "SPX Express",
+        location: validatedData.location,
+        address: validatedData.address,
+        province,
+        district,
+        ward,
+        recipient: {
+          name: validatedData.customerName,
+          phone: validatedData.customerPhone,
+        },
+        paymentMethod: validatedData.paymentMethod,
+        isCod: validatedData.paymentMethod === "Cash on Delivery",
+        codAmount: finalTotalAmount,
+      };
+
       const newOrder = await tx.order.create({
         data: {
           orderNumber,
@@ -176,6 +254,11 @@ export async function POST(req: Request) {
           customerPhone: validatedData.customerPhone,
           customerEmail: validatedData.customerEmail,
           address: validatedData.address,
+          province,
+          district,
+          ward,
+          shippingCarrier: validatedData.shippingCarrier || "SPX Express",
+          shippingParams: (validatedData.shippingParams || defaultShippingParams) as any,
           subtotal: validatedData.subtotal,
           shippingFee: finalShippingFee,
           discount: finalDiscount,
@@ -215,9 +298,12 @@ export async function POST(req: Request) {
       }
 
       return newOrder;
-    }, { isolationLevel: "Serializable" });
+    });
 
-    await sendNewOrderNotification(order.id, storeSettings.currency);
+    // Send email notification asynchronously without blocking customer response
+    sendNewOrderNotification(order.id, storeSettings.currency).catch((err) =>
+      console.error("[ORDER_EMAIL] Async notification error:", err)
+    );
 
     return NextResponse.json({ success: true, orderId: order.id, orderNumber: order.orderNumber }, { status: 201 });
   } catch (error: unknown) {

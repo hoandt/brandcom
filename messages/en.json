@@ -184,6 +184,7 @@
     "changePhone": "Change phone number",
     "securityNote": "The code expires in five minutes and can only be used once.",
     "passwordAlternative": "Or sign in with a password",
+    "zaloAlternative": "Or sign in with Zalo code",
     "emailLogin": "Sign in with email",
     "checkoutAction": "Sign in with Zalo",
     "addressPrompt": "Sign in with Zalo to choose an address",

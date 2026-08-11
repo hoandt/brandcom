@@ -64,6 +64,7 @@ export default function NewProductPage() {
   const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false)
   const [images, setImages] = useState<File[]>([])
   const [imagePreviews, setImagePreviews] = useState<string[]>([])
+  const [isUploadingGallery, setIsUploadingGallery] = useState(false)
   const [mainImageIndex, setMainImageIndex] = useState<number | null>(null)
 
   // Track details fields states locally
@@ -140,25 +141,41 @@ export default function NewProductPage() {
     }
   }, [name, isSlugManuallyEdited]);
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
       const selectedFiles = Array.from(e.target.files);
-      setImages((prev) => [...prev, ...selectedFiles]);
-
-      const previews = selectedFiles.map((file) => URL.createObjectURL(file));
-      setImagePreviews((prev) => [...prev, ...previews]);
-      if (mainImageIndex === null && selectedFiles.length > 0) setMainImageIndex(images.length);
+      setIsUploadingGallery(true);
+      try {
+        const uploadedUrls: string[] = [];
+        for (const file of selectedFiles) {
+          const formData = new FormData();
+          formData.append("file", file);
+          const res = await fetch("/api/admin/upload", {
+            method: "POST",
+            body: formData,
+          });
+          if (!res.ok) throw new Error("Upload failed");
+          const data = await res.json();
+          if (data.url) uploadedUrls.push(data.url);
+        }
+        setImagePreviews((prev) => {
+          const updated = [...prev, ...uploadedUrls];
+          if (mainImageIndex === null && updated.length > 0) setMainImageIndex(0);
+          return updated;
+        });
+      } catch (err) {
+        alert("Failed to upload image to Cloudflare R2");
+      } finally {
+        setIsUploadingGallery(false);
+        e.target.value = "";
+      }
     }
   };
 
   const removeImage = (index: number) => {
-    setImages((prev) => prev.filter((_, i) => i !== index));
-    setImagePreviews((prev) => {
-      URL.revokeObjectURL(prev[index]);
-      return prev.filter((_, i) => i !== index);
-    });
+    setImagePreviews((prev) => prev.filter((_, i) => i !== index));
     setMainImageIndex((current) => {
-      if (images.length <= 1) return null;
+      if (imagePreviews.length <= 1) return null;
       if (current === null) return 0;
       if (current === index) return 0;
       return current > index ? current - 1 : current;
@@ -214,13 +231,27 @@ export default function NewProductPage() {
     });
   };
 
-  // Handle variant image picker
-  const handleVariantImageChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle variant image picker with direct Cloudflare R2 upload
+  const handleVariantImageChange = async (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      const preview = URL.createObjectURL(file);
-      handleVariantChange(index, "imageFile", file);
-      handleVariantChange(index, "imagePreview", preview);
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        const res = await fetch("/api/admin/upload", {
+          method: "POST",
+          body: formData,
+        });
+        if (!res.ok) throw new Error("Upload failed");
+        const data = await res.json();
+        if (data.url) {
+          handleVariantChange(index, "imagePreview", data.url);
+        }
+      } catch (err) {
+        alert("Failed to upload variant image to Cloudflare R2");
+      } finally {
+        e.target.value = "";
+      }
     }
   };
 
@@ -271,21 +302,22 @@ export default function NewProductPage() {
       price: parseFloat(v.price),
       stock: parseInt(v.stock),
       inventories: v.inventories,
+      imageUrl: v.imagePreview || null,
     }))));
 
-    // Append main product images
+    // Append main product images (Cloudflare R2 URLs)
     formData.delete("images");
-    const orderedImages = mainImageIndex !== null && images[mainImageIndex]
-      ? [images[mainImageIndex], ...images.filter((_, index) => index !== mainImageIndex)]
-      : images;
-    orderedImages.forEach((file) => {
-      formData.append("images", file);
+    const orderedImageUrls = mainImageIndex !== null && imagePreviews[mainImageIndex]
+      ? [imagePreviews[mainImageIndex], ...imagePreviews.filter((_, index) => index !== mainImageIndex)]
+      : imagePreviews;
+    orderedImageUrls.forEach((url) => {
+      formData.append("images", url);
     });
 
-    // Append specific variant image files
+    // Append specific variant images
     variants.forEach((v, index) => {
-      if (v.imageFile) {
-        formData.append(`variantImage_${index}`, v.imageFile);
+      if (v.imagePreview) {
+        formData.append(`variantImage_${index}`, v.imagePreview);
       }
     });
 
@@ -611,21 +643,30 @@ export default function NewProductPage() {
               name="images"
               multiple
               accept="image/*"
+              disabled={isUploadingGallery}
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               onChange={handleImageChange}
             />
-            <p className="text-sm text-muted-foreground font-light">
-              Drag & drop images here or <span className="text-primary font-medium hover:underline">browse</span>
-            </p>
+            {isUploadingGallery ? (
+              <p className="text-xs font-bold text-primary flex items-center justify-center gap-2">
+                <span className="w-3.5 h-3.5 border-2 border-primary border-r-transparent rounded-full animate-spin" />
+                Uploading images to Cloudflare R2...
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground font-light">
+                Drag &amp; drop images here or <span className="text-primary font-medium hover:underline">browse</span> (Uploaded directly to Cloudflare R2)
+              </p>
+            )}
           </div>
 
           {/* Image Previews */}
           {imagePreviews.length > 0 && (
-            <div className="grid grid-cols-4 sm:grid-cols-6 gap-4 mt-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-4">
               {imagePreviews.map((preview, index) => {
-                const isMainImage = mainImageIndex === index;
+                const isMainImage = mainImageIndex === index || (mainImageIndex === null && index === 0);
+                const isSecondaryImage = index === 1;
                 return (
-                <div key={preview} className={`relative group overflow-hidden border aspect-square bg-muted ${isMainImage ? "border-2 border-primary" : "border-border"}`}>
+                <div key={preview} className={`relative group overflow-hidden border aspect-square bg-muted ${isMainImage ? "ring-2 ring-primary border-primary" : isSecondaryImage ? "ring-2 ring-neutral-800 dark:ring-neutral-200 border-neutral-800 dark:border-neutral-200" : "border-border"}`}>
                   <img
                     src={preview}
                     alt={`Preview ${index + 1}`}
@@ -634,19 +675,41 @@ export default function NewProductPage() {
                   <button
                     type="button"
                     onClick={() => removeImage(index)}
-                    className="absolute right-1 top-1 bg-destructive p-1 text-xs text-destructive-foreground opacity-0 transition-opacity group-hover:opacity-100"
+                    className="absolute right-1 top-1 bg-destructive w-6 h-6 flex items-center justify-center text-xs text-destructive-foreground opacity-0 transition-opacity group-hover:opacity-100 z-10"
+                    title="Remove image"
                   >
                     ✕
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setMainImageIndex(index)}
-                    className={`absolute bottom-1 left-1 flex h-7 items-center gap-1 border px-2 text-[9px] font-bold uppercase tracking-wider transition-colors ${isMainImage ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background/95 text-foreground sm:opacity-0 sm:group-hover:opacity-100"}`}
-                    aria-label={isMainImage ? "Main product image" : `Set image ${index + 1} as main`}
-                  >
-                    <Star className="h-3 w-3" fill={isMainImage ? "currentColor" : "none"} />
-                    {isMainImage ? "Main" : "Set main"}
-                  </button>
+                  <div className="absolute bottom-1.5 left-1.5 right-1.5 flex items-center justify-between gap-1 z-10">
+                    <button
+                      type="button"
+                      onClick={() => setMainImageIndex(index)}
+                      className={`flex h-6 items-center gap-1 border px-1.5 text-[9px] font-bold uppercase tracking-wider transition-colors ${isMainImage ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background/90 text-foreground hover:bg-background"}`}
+                      aria-label={isMainImage ? "Main product image" : `Set image ${index + 1} as main`}
+                    >
+                      <Star className="h-2.5 w-2.5" fill={isMainImage ? "currentColor" : "none"} />
+                      {isMainImage ? "Main" : "Main"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Move this item to index 1 (Secondary)
+                        if (index !== 1 && imagePreviews.length > 1) {
+                          setImagePreviews((prev) => {
+                            const copy = [...prev];
+                            const [item] = copy.splice(index, 1);
+                            copy.splice(1, 0, item);
+                            return copy;
+                          });
+                        }
+                      }}
+                      className={`flex h-6 items-center gap-1 border px-1.5 text-[9px] font-bold uppercase tracking-wider transition-colors ${isSecondaryImage ? "border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900" : "border-border bg-background/90 text-foreground hover:bg-background"}`}
+                      aria-label={isSecondaryImage ? "Secondary product image" : `Set image ${index + 1} as secondary`}
+                    >
+                      <Star className="h-2.5 w-2.5" fill={isSecondaryImage ? "currentColor" : "none"} />
+                      {isSecondaryImage ? "Secondary" : "Secondary"}
+                    </button>
+                  </div>
                 </div>
                 );
               })}

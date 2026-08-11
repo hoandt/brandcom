@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { omitShippingMappings } from "@/lib/location-sanitizer";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -18,7 +19,7 @@ export async function GET(request: Request) {
     // If the returned locations are already level 2 (wards), return them directly
     const isWards = locations.length > 0 && locations[0].level === 2;
     if (isWards) {
-      return NextResponse.json({ success: true, data: locations });
+      return NextResponse.json({ success: true, data: omitShippingMappings(locations) });
     }
 
     const wardPromises = locations.map(async (dist: any) => {
@@ -33,7 +34,7 @@ export async function GET(request: Request) {
     const wardsArrays = await Promise.all(wardPromises);
     const allWards = wardsArrays.flat();
 
-    return NextResponse.json({ success: true, data: allWards });
+    return NextResponse.json({ success: true, data: omitShippingMappings(allWards) });
   } catch (error) {
     console.error("Error fetching wards:", error);
     return NextResponse.json({ success: false, message: "Failed to fetch wards" }, { status: 500 });

@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { uploadFileToR2 } from "@/lib/r2";
 import { slugify } from "@/lib/slugify";
 import { revalidateTag } from "next/cache";
+import { invalidateProductsListCache } from "../route";
 
 async function authorized() {
   const session = await auth();
@@ -29,16 +30,57 @@ type SubmittedVariant = {
   imageUrl?: string | null;
 };
 
+// Simple in-memory cache for GET /api/admin/products/[productId]
+const productCache = new Map<string, { data: any; timestamp: number }>();
+const CACHE_TTL_MS = 30_000;
+
+export function invalidateAdminProductCache(productId?: string) {
+  if (productId) {
+    productCache.delete(productId);
+  } else {
+    productCache.clear();
+  }
+}
+
+
+
 export async function GET(_req: Request, { params }: { params: Promise<{ productId: string }> }) {
   if (!(await authorized())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { productId } = await params;
+
+  const cached = productCache.get(productId);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    return NextResponse.json(cached.data);
+  }
+
   const [product, warehouses] = await Promise.all([
     prisma.product.findUnique({
       where: { id: productId },
-      include: {
-        images: { orderBy: { position: "asc" } },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        status: true,
+        description: true,
+        overview: true,
+        materials: true,
+        care: true,
+        cardHoverVideoUrl: true,
+        cardHoverImageUrl: true,
         categories: { select: { id: true } },
-        variants: { orderBy: { id: "asc" }, include: { inventories: true } },
+        images: { orderBy: { position: "asc" }, select: { url: true } },
+        variants: {
+          orderBy: { id: "asc" },
+          select: {
+            id: true,
+            name: true,
+            sku: true,
+            price: true,
+            stock: true,
+            imageUrl: true,
+            inventories: { select: { warehouseId: true, quantity: true } },
+          },
+        },
       },
     }),
     prisma.warehouse.findMany({
@@ -48,7 +90,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ product
     }),
   ]);
   if (!product) return NextResponse.json({ error: "Product not found" }, { status: 404 });
-  return NextResponse.json({
+
+  const result = {
     product: {
       id: product.id,
       name: product.name,
@@ -73,7 +116,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ product
       })),
       warehouses,
     },
-  });
+  };
+
+  productCache.set(productId, { data: result, timestamp: Date.now() });
+  return NextResponse.json(result);
 }
 
 export async function PUT(
@@ -116,7 +162,6 @@ export async function PUT(
       return NextResponse.json({ error: "At least one variant is required" }, { status: 400 });
     }
 
-
     if (categoryIds.length > 0) {
       const categoryCount = await prisma.category.count({ where: { id: { in: categoryIds }, isActive: true } });
       if (categoryCount !== categoryIds.length) {
@@ -133,6 +178,7 @@ export async function PUT(
         slug,
         NOT: { id: productId },
       },
+      select: { id: true },
     });
     let counter = 1;
     let uniqueSlug = slug;
@@ -143,6 +189,7 @@ export async function PUT(
           slug: uniqueSlug,
           NOT: { id: productId },
         },
+        select: { id: true },
       });
       counter++;
     }
@@ -157,8 +204,8 @@ export async function PUT(
       ),
     ];
 
-    // Handle new uploads
-    const newImages = formData.getAll("images") as File[];
+    // Handle new uploads if any raw Files were attached
+    const newImages = formData.getAll("images");
     const newImageUrls: string[] = [];
 
     const cardHoverVideo = formData.get("cardHoverVideo") as File | null;
@@ -168,33 +215,39 @@ export async function PUT(
       cardHoverVideoUrl = await uploadFileToR2(Buffer.from(await cardHoverVideo.arrayBuffer()), cardHoverVideo.name, cardHoverVideo.type);
     }
 
-    for (const image of newImages) {
-      if (image && image.size > 0) {
-        const arrayBuffer = await image.arrayBuffer();
+    for (const entry of newImages) {
+      if (typeof entry === "string" && entry.length > 0) {
+        newImageUrls.push(entry);
+      } else if (entry && typeof entry === "object" && "size" in entry && (entry as File).size > 0) {
+        const file = entry as File;
+        const arrayBuffer = await file.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
-        const url = await uploadFileToR2(buffer, image.name, image.type);
+        const url = await uploadFileToR2(buffer, file.name, file.type);
         newImageUrls.push(url);
       }
     }
 
     // Process variant image uploads
     for (let idx = 0; idx < variants.length; idx++) {
-      const variantImageFile = formData.get(`variantImage_${idx}`) as File;
-      if (variantImageFile && variantImageFile.size > 0) {
-        const arrayBuffer = await variantImageFile.arrayBuffer();
+      const variantImageEntry = formData.get(`variantImage_${idx}`);
+      if (typeof variantImageEntry === "string" && variantImageEntry.length > 0) {
+        variants[idx].imageUrl = variantImageEntry;
+      } else if (variantImageEntry && typeof variantImageEntry === "object" && "size" in variantImageEntry && (variantImageEntry as File).size > 0) {
+        const file = variantImageEntry as File;
+        const arrayBuffer = await file.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
-        const url = await uploadFileToR2(buffer, variantImageFile.name, variantImageFile.type);
+        const url = await uploadFileToR2(buffer, file.name, file.type);
         variants[idx].imageUrl = url;
       }
     }
 
-    // Read the current relations before opening the transaction so image
-    // changes can be reconciled without deleting and recreating the gallery.
+    // Read current relations before update
     const currentProduct = await prisma.product.findUnique({
       where: { id: productId },
-      include: {
-        images: { orderBy: { position: "asc" } },
-        variants: true,
+      select: {
+        id: true,
+        images: { orderBy: { position: "asc" }, select: { url: true } },
+        variants: { select: { id: true, name: true, sku: true, price: true, stock: true, imageUrl: true } },
       },
     });
 
@@ -228,135 +281,155 @@ export async function PUT(
           ...allImageUrls.filter((url) => url !== selectedMainImageUrl),
         ]
       : allImageUrls;
-    const retainedImageIds = orderedImageUrls.flatMap((url) => {
-      const image = currentImageByUrl.get(url);
-      return image ? [image.id] : [];
-    });
-    const newGalleryImageUrls = orderedImageUrls.filter(
-      (url) => !currentImageByUrl.has(url),
-    );
 
-    // Identify variants to delete (variants in DB whose IDs are not in the submitted variants list)
+    // Identify variants to delete
     const submittedVariantIds = variants.map((variant) => variant.id).filter((id): id is string => Boolean(id));
     const variantsToDelete = currentProduct.variants.filter(
       (v) => !submittedVariantIds.includes(v.id)
     );
 
-    const preparedVariants = variants.map((variant) => {
-      const inventories = Array.isArray(variant.inventories)
-        ? variant.inventories
-            .map((inventory) => ({
-              warehouseId: inventory.warehouseId || "",
-              quantity: Math.max(0, Math.floor(Number(inventory.quantity) || 0)),
-            }))
-            .filter((inventory) => inventory.warehouseId && inventory.quantity > 0)
-        : [];
-      return {
-        ...variant,
-        inventories,
-        totalStock: inventories.reduce((sum, inventory) => sum + inventory.quantity, 0),
-      };
-    });
+    const existingVariantIds = currentProduct.variants.map((v) => v.id);
+    const currentVariantMap = new Map(currentProduct.variants.map((v) => [v.id, v]));
 
-    const variantOperations = preparedVariants.map((v) => {
-      if (v.id) {
-        return prisma.productVariant.update({
-          where: { id: v.id },
-          data: {
-            name: v.name,
-            sku: v.sku,
-            price: v.price,
-            stock: v.totalStock,
-            imageUrl: v.imageUrl || null,
-            inventories: {
-              deleteMany: {},
-              ...(v.inventories.length > 0
-                ? { createMany: { data: v.inventories } }
-                : {}),
-            },
-          },
-        });
-      }
-      return prisma.productVariant.create({
+    // ── FAST BULK PARALLEL TRANSACTION ─────────────────────────
+    await prisma.$transaction(async (tx) => {
+      // 1. Update product base info
+      await tx.product.update({
+        where: { id: productId },
         data: {
-          productId,
-          name: v.name,
-          sku: v.sku,
-          price: v.price,
-          stock: v.totalStock,
-          imageUrl: v.imageUrl || null,
-          isActive: true,
-          inventories: v.inventories.length > 0
-            ? { createMany: { data: v.inventories } }
-            : undefined,
+          name,
+          slug,
+          status,
+          description,
+          overview,
+          materials,
+          care,
+          cardHoverVideoUrl: cardHoverVideoUrl || null,
+          cardHoverImageUrl: cardHoverImageUrl || null,
+          categories: { set: categoryIds.map((id) => ({ id })) },
         },
       });
-    });
 
-    // All writes are known in advance, so a batch transaction avoids the
-    // interactive transaction lease while preserving all-or-nothing behavior.
-    await prisma.$transaction(
-      [
-        prisma.product.update({
-          where: { id: productId },
-          data: {
-            name,
-            slug,
-            status,
-            description,
-            overview,
-            materials,
-            care,
-            cardHoverVideoUrl: cardHoverVideoUrl || null,
-            cardHoverImageUrl: cardHoverImageUrl || null,
-            categories: { set: categoryIds.map((id) => ({ id })) },
-          },
-        }),
-        prisma.productImage.deleteMany({
-          where: {
+      // 2. Re-create product images in bulk
+      await tx.productImage.deleteMany({ where: { productId } });
+      if (orderedImageUrls.length > 0) {
+        await tx.productImage.createMany({
+          data: orderedImageUrls.map((url, position) => ({
             productId,
-            ...(retainedImageIds.length > 0
-              ? { id: { notIn: retainedImageIds } }
-              : {}),
-          },
-        }),
-        ...orderedImageUrls.flatMap((url, position) => {
-          const image = currentImageByUrl.get(url);
-          return image
-            ? [
-                prisma.productImage.update({
-                  where: { id: image.id },
-                  data: { alt: name, position },
-                }),
-              ]
-            : [];
-        }),
-        ...(newGalleryImageUrls.length > 0
-          ? [
-              prisma.productImage.createMany({
-                data: newGalleryImageUrls.map((url) => ({
-                  productId,
-                  url,
-                  alt: name,
-                  position: orderedImageUrls.indexOf(url),
-                })),
-              }),
-            ]
-          : []),
-        ...(variantsToDelete.length > 0
-          ? [prisma.productVariant.deleteMany({
-              where: { id: { in: variantsToDelete.map((v) => v.id) } },
-            })]
-          : []),
-        ...variantOperations,
-      ],
-      { maxWait: 10_000, timeout: 30_000 },
-    );
+            url,
+            alt: name,
+            position,
+          })),
+        });
+      }
 
-    revalidateTag("products");
+      // 3. Delete old inventories for existing variants in 1 bulk query
+      if (existingVariantIds.length > 0) {
+        await tx.warehouseInventory.deleteMany({
+          where: { variantId: { in: existingVariantIds } },
+        });
+      }
+
+      // 4. Delete removed variants in 1 bulk query
+      if (variantsToDelete.length > 0) {
+        await tx.productVariant.deleteMany({
+          where: { id: { in: variantsToDelete.map((v) => v.id) } },
+        });
+      }
+
+      // 5. Update/Create variants in parallel ONLY if fields actually changed
+      const inventoryRows: { variantId: string; warehouseId: string; quantity: number }[] = [];
+      const updatePromises: Promise<any>[] = [];
+
+      for (const v of variants) {
+        const inventories = Array.isArray(v.inventories)
+          ? v.inventories
+              .map((inv) => ({
+                warehouseId: inv.warehouseId || "",
+                quantity: Math.max(0, Math.floor(Number(inv.quantity) || 0)),
+              }))
+              .filter((inv) => inv.warehouseId && inv.quantity > 0)
+          : [];
+        const totalStock = inventories.reduce((sum, inv) => sum + inv.quantity, 0);
+
+        let variantId = v.id;
+        if (variantId) {
+          const existingVariant = currentVariantMap.get(variantId);
+          const hasChanged =
+            !existingVariant ||
+            existingVariant.name !== v.name ||
+            existingVariant.sku !== v.sku ||
+            Number(existingVariant.price) !== Number(v.price) ||
+            existingVariant.stock !== totalStock ||
+            (existingVariant.imageUrl || "") !== (v.imageUrl || "");
+
+          if (hasChanged) {
+            updatePromises.push(
+              tx.productVariant.update({
+                where: { id: variantId },
+                data: {
+                  name: v.name,
+                  sku: v.sku,
+                  price: v.price,
+                  stock: totalStock,
+                  imageUrl: v.imageUrl || null,
+                },
+              })
+            );
+          }
+        } else {
+          const createdVariant = await tx.productVariant.create({
+            data: {
+              productId,
+              name: v.name,
+              sku: v.sku,
+              price: v.price,
+              stock: totalStock,
+              imageUrl: v.imageUrl || null,
+              isActive: true,
+            },
+            select: { id: true },
+          });
+          variantId = createdVariant.id;
+        }
+
+        for (const inv of inventories) {
+          inventoryRows.push({
+            variantId: variantId!,
+            warehouseId: inv.warehouseId,
+            quantity: inv.quantity,
+          });
+        }
+      }
+
+      // Execute all changed variant updates in parallel
+      if (updatePromises.length > 0) {
+        await Promise.all(updatePromises);
+      }
+
+      // 6. Insert all new inventories across all variants in 1 bulk query
+      if (inventoryRows.length > 0) {
+        await tx.warehouseInventory.createMany({
+          data: inventoryRows,
+        });
+      }
+    }, { maxWait: 10_000, timeout: 30_000 });
+
+    invalidateAdminProductCache(productId);
+    invalidateProductsListCache();
+    if (process.env.NODE_ENV === "production") {
+      revalidateTag("products");
+    }
+
     const savedProduct = await prisma.product.findUnique({
       where: { id: productId },
-      include: { images: { orderBy: { position: "asc" } } },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        status: true,
+        images: { orderBy: { position: "asc" }, select: { url: true } },
+      },
     });
     return NextResponse.json(savedProduct);
   } catch (error) {

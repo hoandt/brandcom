@@ -1,7 +1,16 @@
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
+let navCache: { data: any; timestamp: number } | null = null;
+const CACHE_TTL_MS = 300_000; // 5 minutes
+
 export async function GET() {
+  if (navCache && Date.now() - navCache.timestamp < CACHE_TTL_MS) {
+    return NextResponse.json(navCache.data, {
+      headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=900" },
+    });
+  }
+
   const rows = await prisma.category.findMany({
     where: { isActive: true },
     orderBy: [{ position: "asc" }, { name: "asc" }],
@@ -26,8 +35,11 @@ export async function GET() {
     imageUrl: products.flatMap((product) => product.images).find((image) => image.url)?.url ?? null,
   }));
 
+  const data = { categories };
+  navCache = { data, timestamp: Date.now() };
+
   return NextResponse.json(
-    { categories },
+    data,
     { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=900" } }
   );
 }

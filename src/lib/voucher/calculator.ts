@@ -3,27 +3,41 @@ export type VoucherBenefit =
       scope: "cart";
       type: "fixed_amount";
       value: number;
+      canCombine?: boolean;
     }
   | {
       scope: "cart";
       type: "percentage";
       value: number;
       maxDiscountAmount?: number;
+      canCombine?: boolean;
     }
   | {
       scope: "shipping";
       type: "fixed_amount";
       value: number;
+      canCombine?: boolean;
     }
   | {
       scope: "shipping";
       type: "free_shipping";
+      canCombine?: boolean;
+    }
+  | {
+      scope: "payment";
+      type: "fixed_amount" | "percentage";
+      paymentMethod?: string;
+      isAutomatic?: boolean;
+      value: number;
+      maxDiscountAmount?: number;
+      canCombine?: boolean;
     };
 
 export interface CalculateDiscountParams {
   benefit: VoucherBenefit;
   cartSubtotal: number; // in cents/smallest currency unit
   shippingFee: number; // in cents/smallest currency unit
+  paymentMethod?: string;
 }
 
 export interface DiscountResult {
@@ -60,6 +74,15 @@ export function calculateDiscount({
       shippingDiscount = Math.min(benefit.value, shippingFee);
     } else if (benefit.type === "free_shipping") {
       shippingDiscount = shippingFee;
+    }
+  } else if (benefit.scope === "payment") {
+    if (benefit.type === "fixed_amount") {
+      cartDiscount = Math.min(benefit.value, cartSubtotal);
+    } else if (benefit.type === "percentage") {
+      cartDiscount = Math.floor((cartSubtotal * benefit.value) / 100);
+      if (benefit.maxDiscountAmount !== undefined && benefit.maxDiscountAmount !== null) {
+        cartDiscount = Math.min(cartDiscount, benefit.maxDiscountAmount);
+      }
     }
   }
 

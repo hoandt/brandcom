@@ -79,8 +79,9 @@ export function PhonePasswordLoginForm({
           inputMode="tel"
           autoComplete="tel"
           placeholder={t("phonePlaceholder")}
-          className="h-12 rounded-none"
+          className="h-12 rounded-none text-base"
           aria-invalid={Boolean(errorMessage)}
+          autoFocus
         />
       </label>
 
