@@ -141,6 +141,7 @@ export default async function ProductPage({ params }: Props) {
           name: product.name,
           slug: product.slug,
           images: product.images,
+          cardHoverImageUrl: product.cardHoverImageUrl,
           variants: product.variants.map((v) => ({
             id: v.id,
             sku: v.sku,

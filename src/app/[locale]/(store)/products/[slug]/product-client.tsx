@@ -29,6 +29,7 @@ type ProductClientProps = {
     name: string;
     slug: string;
     images: { url: string }[];
+    cardHoverImageUrl?: string | null;
     variants: Variant[];
   };
   details: {
@@ -90,6 +91,15 @@ export function ProductClient({ product, details }: ProductClientProps) {
       allImages.push({ url: v.imageUrl });
     }
   });
+
+  // Reorder images to put the secondary image at index 1
+  if (product.cardHoverImageUrl) {
+    const secondaryIdx = allImages.findIndex(img => img.url === product.cardHoverImageUrl);
+    if (secondaryIdx > 1) {
+      const [secondaryImg] = allImages.splice(secondaryIdx, 1);
+      allImages.splice(1, 0, secondaryImg);
+    }
+  }
 
   const displayImages = [...allImages];
   if (activeImageIdx > 0 && activeImageIdx < displayImages.length) {
