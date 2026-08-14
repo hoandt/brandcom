@@ -3,15 +3,20 @@ import Image from "next/image"
 import Link from "next/link"
 import { ArrowRight } from "lucide-react"
 import { getTranslations } from "next-intl/server"
+import { getStoreSettings } from "@/lib/store-settings"
+import { storefrontCache } from "@/lib/storefront-cache"
 
 export async function FeaturedCategories({ locale }: { locale: string }) {
   const t = await getTranslations("Homepage")
   
-  const categories = await prisma.category.findMany({
-    where: { isActive: true, parentId: null },
-    take: 4,
-    orderBy: { position: 'asc' },
-  })
+  const settings = await getStoreSettings()
+  const categories = await storefrontCache("categories:featured", settings.categoryCacheSeconds, () =>
+    prisma.category.findMany({
+      where: { isActive: true, parentId: null },
+      take: 4,
+      orderBy: { position: 'asc' },
+    })
+  )
 
   if (categories.length === 0) return null
 

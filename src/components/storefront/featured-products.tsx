@@ -4,11 +4,14 @@ import Link from "next/link"
 import { ArrowRight } from "lucide-react"
 import { getTranslations } from "next-intl/server"
 import { ProductCard } from "./product-card"
+import { getStoreSettings } from "@/lib/store-settings"
+import { storefrontCache } from "@/lib/storefront-cache"
 
 export async function FeaturedProducts({ locale }: { locale: string }) {
   const t = await getTranslations("Homepage")
   
-  const [products, storeSettings] = await Promise.all([
+  const storeSettings = await getStoreSettings()
+  const products = await storefrontCache("products:featured", storeSettings.collectionCacheSeconds, () =>
     prisma.product.findMany({
       where: { status: "ACTIVE" },
       take: 4,
@@ -19,11 +22,10 @@ export async function FeaturedProducts({ locale }: { locale: string }) {
         categories: { where: { isActive: true }, orderBy: [{ position: "asc" }, { name: "asc" }], take: 1 },
         reviews: { where: { status: "APPROVED" }, select: { rating: true } },
       }
-    }),
-    prisma.storeSettings.findFirst({ select: { currency: true } }),
-  ])
+    })
+  )
 
-  const currency = storeSettings?.currency
+  const currency = storeSettings.currency
 
   return (
     <section className="storefront-container py-24">

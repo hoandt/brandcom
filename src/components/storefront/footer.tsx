@@ -17,7 +17,7 @@ export function Footer({ locale }: FooterProps) {
       if (!response.ok) throw new Error("Failed to load store settings");
       return response.json();
     },
-    staleTime: 5 * 60_000,
+    staleTime: 0,
     refetchOnWindowFocus: false,
   });
   const storeName = data?.settings.storeName || "Store";

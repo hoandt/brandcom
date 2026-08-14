@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
+import { getStoreSettings } from "@/lib/store-settings";
+import { publicCacheHeaders, storefrontCache } from "@/lib/storefront-cache";
 
 export async function GET(
   request: Request,
@@ -7,8 +9,8 @@ export async function GET(
 ) {
   try {
     const { slug } = await params;
-    
-    const [products, storeSettings] = await Promise.all([
+    const settings = await getStoreSettings();
+    const products = await storefrontCache(`collection:${slug}`, settings.collectionCacheSeconds, () =>
       prisma.product.findMany({
         where: { status: "ACTIVE" },
         include: {
@@ -19,11 +21,13 @@ export async function GET(
         },
         orderBy: { createdAt: "desc" },
         ...(slug === "new" ? { take: 24 } : {}),
-      }),
-      prisma.storeSettings.findFirst({ select: { currency: true } }),
-    ]);
+      })
+    );
 
-    return NextResponse.json({ success: true, data: products, currency: storeSettings?.currency });
+    return NextResponse.json(
+      { success: true, data: products, currency: settings.currency, cacheSeconds: settings.collectionCacheSeconds },
+      { headers: publicCacheHeaders(settings.collectionCacheSeconds) },
+    );
     
   } catch (error) {
     console.error("[COLLECTIONS_API_ERROR]", error);

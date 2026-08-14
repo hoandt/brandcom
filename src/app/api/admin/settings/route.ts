@@ -4,6 +4,7 @@ import { DEFAULT_TENANT_ID, getStoreSettings, invalidateStoreSettingsCache } fro
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { isAdminEmail } from "@/lib/admin-access";
+import { invalidateStorefrontCache } from "@/lib/storefront-cache";
 
 const schema = z.object({
   storeName: z.string().trim().min(1).max(100),
@@ -17,6 +18,10 @@ const schema = z.object({
   orderPrefix: z.string().trim().min(1).max(12).regex(/^[A-Za-z0-9_-]+$/).transform((value) => value.toUpperCase()),
   fallbackShippingFee: z.number().int().min(0),
   lowStockThreshold: z.number().int().min(0),
+  productCacheSeconds: z.number().int().min(0).max(86400),
+  collectionCacheSeconds: z.number().int().min(0).max(86400),
+  categoryCacheSeconds: z.number().int().min(0).max(86400),
+  storeSettingsCacheSeconds: z.number().int().min(0).max(86400),
   nonCodDiscountEnabled: z.boolean().default(true),
   nonCodDiscountType: z.enum(["percentage", "fixed_amount"]).default("percentage"),
   nonCodDiscountValue: z.number().min(0).default(5),
@@ -62,6 +67,7 @@ export async function PUT(request: Request) {
       create: { ...data, marketplaceShopId, orderNotificationEmail, tenantId: DEFAULT_TENANT_ID },
     });
     invalidateStoreSettingsCache();
+    invalidateStorefrontCache();
     return NextResponse.json({ settings });
   } catch (error) {
     if (error instanceof z.ZodError) return NextResponse.json({ error: "Invalid settings", issues: error.errors }, { status: 400 });

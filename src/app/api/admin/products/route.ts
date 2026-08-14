@@ -6,6 +6,7 @@ import { uploadFileToR2 } from "@/lib/r2";
 import { slugify } from "@/lib/slugify";
 import { revalidateTag } from "next/cache";
 import { z } from "zod";
+import { invalidateStorefrontCache } from "@/lib/storefront-cache";
 
 async function authorized() {
   const session = await auth();
@@ -96,6 +97,7 @@ export async function DELETE(req: Request) {
       revalidateTag("products");
     }
     invalidateProductsListCache();
+    invalidateStorefrontCache();
     return NextResponse.json({ success: true, deleted: result });
   } catch (error) {
     console.error("[BULK_DELETE_PRODUCTS_ERROR]", error);
@@ -242,6 +244,7 @@ export async function POST(req: Request) {
       revalidateTag("products");
     }
     invalidateProductsListCache();
+    invalidateStorefrontCache();
     return NextResponse.json(product);
   } catch (error) {
     console.error("[CREATE_PRODUCT_API_ERROR]", error);

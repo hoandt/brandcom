@@ -13,7 +13,9 @@ type Settings = {
   tenantId: string; storeName: string; legalName: string | null; tagline: string | null;
   supportEmail: string | null; supportPhone: string | null; defaultLocale: "vi" | "en" | "th";
   currency: string; timezone: string; orderPrefix: string; fallbackShippingFee: number;
-  lowStockThreshold: number; nonCodDiscountEnabled: boolean; nonCodDiscountType: "percentage" | "fixed_amount";
+  lowStockThreshold: number; productCacheSeconds: number; collectionCacheSeconds: number;
+  categoryCacheSeconds: number; storeSettingsCacheSeconds: number;
+  nonCodDiscountEnabled: boolean; nonCodDiscountType: "percentage" | "fixed_amount";
   nonCodDiscountValue: number; marketplaceShopId: string | null;
   marketplaceShops: { marketplace: "shopee" | "lazada" | "tiktok_shop"; shopId: string }[];
   orderNotificationEnabled: boolean; orderNotificationEmail: string | null;
@@ -24,6 +26,7 @@ const emptySettings: Settings = {
   tenantId: "", storeName: "", legalName: "", tagline: "", supportEmail: "", supportPhone: "",
   defaultLocale: "vi", currency: "VND", timezone: "Asia/Ho_Chi_Minh", orderPrefix: "ORD",
   fallbackShippingFee: 30000, lowStockThreshold: 5, nonCodDiscountEnabled: true, nonCodDiscountType: "percentage",
+  productCacheSeconds: 900, collectionCacheSeconds: 300, categoryCacheSeconds: 300, storeSettingsCacheSeconds: 300,
   nonCodDiscountValue: 5, marketplaceShopId: null, marketplaceShops: [],
   orderNotificationEnabled: true, orderNotificationEmail: null,
   orderNotificationEmails: [],
@@ -31,6 +34,7 @@ const emptySettings: Settings = {
 
 const settingsSections = [
   { id: "identity", label: "Store identity", icon: Building2 },
+  { id: "cache", label: "Storefront cache", icon: Globe2 },
   { id: "regional", label: "Regional", icon: Globe2 },
   { id: "orders", label: "Orders & inventory", icon: PackageCheck },
   { id: "payment-discount", label: "Payment discount", icon: Banknote },
@@ -126,6 +130,13 @@ export default function AdminSettingsPage() {
         <Field label="Support email"><Input type="email" value={form.supportEmail || ""} onChange={(event) => setForm({ ...form, supportEmail: event.target.value })} /></Field>
         <Field label="Support phone"><Input value={form.supportPhone || ""} onChange={(event) => setForm({ ...form, supportPhone: event.target.value })} /></Field>
         <div className="md:col-span-2"><Field label="Tagline"><Input value={form.tagline || ""} onChange={(event) => setForm({ ...form, tagline: event.target.value })} /></Field></div>
+      </SettingsSection>
+
+      <SettingsSection id="cache" icon={Globe2} title="Storefront cache" description="Public storefront cache lifetimes in seconds. Use 0 to disable a cache. Checkout and signed-in areas are never cached.">
+        <Field label="Product content"><Input type="number" min="0" max="86400" value={form.productCacheSeconds} onChange={(event) => setForm({ ...form, productCacheSeconds: Number(event.target.value) })} /><span className="text-[10px] font-normal text-muted-foreground">Recommended: 900 seconds</span></Field>
+        <Field label="Collections"><Input type="number" min="0" max="86400" value={form.collectionCacheSeconds} onChange={(event) => setForm({ ...form, collectionCacheSeconds: Number(event.target.value) })} /><span className="text-[10px] font-normal text-muted-foreground">Recommended: 300 seconds</span></Field>
+        <Field label="Categories"><Input type="number" min="0" max="86400" value={form.categoryCacheSeconds} onChange={(event) => setForm({ ...form, categoryCacheSeconds: Number(event.target.value) })} /><span className="text-[10px] font-normal text-muted-foreground">Recommended: 300 seconds</span></Field>
+        <Field label="Store settings"><Input type="number" min="0" max="86400" value={form.storeSettingsCacheSeconds} onChange={(event) => setForm({ ...form, storeSettingsCacheSeconds: Number(event.target.value) })} /><span className="text-[10px] font-normal text-muted-foreground">Recommended: 300 seconds</span></Field>
       </SettingsSection>
 
       <SettingsSection id="regional" icon={Globe2} title="Regional settings" description="Formatting defaults for this tenant.">

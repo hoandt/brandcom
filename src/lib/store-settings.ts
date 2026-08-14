@@ -16,6 +16,10 @@ export const DEFAULT_STORE_SETTINGS = {
   orderPrefix: process.env.DEFAULT_ORDER_PREFIX || "ORD",
   fallbackShippingFee: Number(process.env.DEFAULT_SHIPPING_FEE || 30000),
   lowStockThreshold: Number(process.env.DEFAULT_LOW_STOCK_THRESHOLD || 5),
+  productCacheSeconds: Number(process.env.DEFAULT_PRODUCT_CACHE_SECONDS || 900),
+  collectionCacheSeconds: Number(process.env.DEFAULT_COLLECTION_CACHE_SECONDS || 300),
+  categoryCacheSeconds: Number(process.env.DEFAULT_CATEGORY_CACHE_SECONDS || 300),
+  storeSettingsCacheSeconds: Number(process.env.DEFAULT_STORE_SETTINGS_CACHE_SECONDS || 300),
   nonCodDiscountEnabled: true,
   nonCodDiscountType: "percentage",
   nonCodDiscountValue: 5,
@@ -63,5 +67,6 @@ export type PublicStoreSettings = Pick<
   Awaited<ReturnType<typeof getStoreSettings>>,
   "tenantId" | "storeName" | "legalName" | "tagline" | "supportEmail" | "supportPhone" |
   "defaultLocale" | "currency" | "timezone" | "orderPrefix" | "fallbackShippingFee" | "lowStockThreshold" |
+  "productCacheSeconds" | "collectionCacheSeconds" | "categoryCacheSeconds" | "storeSettingsCacheSeconds" |
   "nonCodDiscountEnabled" | "nonCodDiscountType" | "nonCodDiscountValue"
 >;

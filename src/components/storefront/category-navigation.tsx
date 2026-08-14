@@ -21,7 +21,7 @@ function useCategoryNavigation() {
       if (!response.ok) throw new Error("Failed to load category navigation");
       return response.json();
     },
-    staleTime: 5 * 60_000,
+    staleTime: 0,
     refetchOnWindowFocus: false,
   });
 }

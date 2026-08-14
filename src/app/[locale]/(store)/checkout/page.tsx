@@ -137,13 +137,13 @@ export default function CheckoutPage() {
       nonCodDiscountValue?: number;
     };
   }>({
-    queryKey: ["store-settings"],
+    queryKey: ["checkout-store-settings"],
     queryFn: async () => {
-      const response = await fetch("/api/settings");
+      const response = await fetch("/api/settings?fresh=1", { cache: "no-store" });
       if (!response.ok) throw new Error("Failed to load store settings");
       return response.json();
     },
-    staleTime: 5 * 60_000,
+    staleTime: 0,
     refetchOnWindowFocus: false,
   });
   const storeName = storeSettingsData?.settings.storeName || "Store";

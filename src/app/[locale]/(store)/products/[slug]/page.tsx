@@ -1,21 +1,22 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { ProductClient } from "./product-client";
-import { unstable_cache } from "next/cache";
 import type { Metadata } from "next";
 import { brandConfig } from "@/lib/brand-config";
 import { marked } from "marked";
 import { getCategoryPath } from "@/lib/categories";
 import { getTranslations } from "next-intl/server";
+import { getStoreSettings } from "@/lib/store-settings";
+import { storefrontCache } from "@/lib/storefront-cache";
 
 type Props = {
   params: Promise<{ locale: string; slug: string }>;
 };
 
-// Use unstable_cache to persistently cache the product details across requests!
-const getProduct = unstable_cache(
-  async (slug: string) => {
-    return prisma.product.findUnique({
+async function getProduct(slug: string) {
+  const settings = await getStoreSettings();
+  return storefrontCache(`product:${slug}`, settings.productCacheSeconds, () =>
+    prisma.product.findUnique({
       where: { slug },
       include: {
         images: {
@@ -26,11 +27,9 @@ const getProduct = unstable_cache(
         },
         categories: { select: { id: true } },
       },
-    });
-  },
-  ['product-details-cache'], // cache key
-  { revalidate: 3600, tags: ['products'] } // cache for 1 hour
-);
+    })
+  );
+}
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;

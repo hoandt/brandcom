@@ -6,6 +6,7 @@ import { uploadFileToR2 } from "@/lib/r2";
 import { slugify } from "@/lib/slugify";
 import { revalidateTag } from "next/cache";
 import { invalidateProductsListCache } from "../route";
+import { invalidateStorefrontCache } from "@/lib/storefront-cache";
 
 async function authorized() {
   const session = await auth();
@@ -412,6 +413,7 @@ export async function PUT(
 
     invalidateAdminProductCache(productId);
     invalidateProductsListCache();
+    invalidateStorefrontCache();
     if (process.env.NODE_ENV === "production") {
       revalidateTag("products");
     }

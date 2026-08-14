@@ -6,6 +6,8 @@ import { getLocale } from "next-intl/server";
 import { getDescendantIds } from "@/lib/categories";
 import { getTranslations } from "next-intl/server";
 import { ProductCard } from "@/components/storefront/product-card";
+import { getStoreSettings } from "@/lib/store-settings";
+import { storefrontCache } from "@/lib/storefront-cache";
 
 export default async function CategoryPage({
   params,
@@ -14,21 +16,22 @@ export default async function CategoryPage({
 }) {
   const { slug } = await params;
   const locale = await getLocale();
+  const settings = await getStoreSettings();
 
   const [category, allCategories] = await Promise.all([
-    prisma.category.findUnique({
+    storefrontCache(`category:${slug}`, settings.categoryCacheSeconds, () => prisma.category.findUnique({
       where: { slug },
       include: { children: { where: { isActive: true }, orderBy: [{ position: "asc" }, { name: "asc" }] } },
-    }),
-    prisma.category.findMany({ where: { isActive: true }, select: { id: true, name: true, slug: true, parentId: true } }),
+    })),
+    storefrontCache("categories:paths", settings.categoryCacheSeconds, () => prisma.category.findMany({ where: { isActive: true }, select: { id: true, name: true, slug: true, parentId: true } })),
   ]);
 
   if (!category || !category.isActive) {
     notFound();
   }
   const categoryIds = [category.id, ...getDescendantIds(allCategories, category.id)];
-  const [products, tNavbar, storeSettings] = await Promise.all([
-    prisma.product.findMany({
+  const [products, tNavbar] = await Promise.all([
+    storefrontCache(`category:${slug}:products`, settings.categoryCacheSeconds, () => prisma.product.findMany({
       where: { status: "ACTIVE", categories: { some: { id: { in: categoryIds }, isActive: true } } },
       include: {
         variants: { where: { isActive: true }, orderBy: { price: "asc" } },
@@ -37,9 +40,8 @@ export default async function CategoryPage({
         reviews: { where: { status: "APPROVED" }, select: { rating: true } },
       },
       orderBy: { createdAt: "desc" },
-    }),
+    })),
     getTranslations("Navbar"),
-    prisma.storeSettings.findFirst({ select: { currency: true } }),
   ]);
   return (
     <div>
@@ -101,7 +103,7 @@ export default async function CategoryPage({
             key={product.id}
             product={product}
             locale={locale}
-            currency={storeSettings?.currency}
+            currency={settings.currency}
           />
         ))}
 

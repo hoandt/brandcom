@@ -7,6 +7,7 @@ import { uploadFileToR2 } from "@/lib/r2";
 import { Prisma } from "@/generated/prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { invalidateStorefrontCache } from "@/lib/storefront-cache";
 
 const categorySchema = z.object({
   name: z.string().trim().min(1).max(120),
@@ -74,6 +75,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ catego
       },
       include: { _count: { select: { products: true, children: true } } },
     });
+    invalidateStorefrontCache();
     return NextResponse.json({ category });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
@@ -99,5 +101,6 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ cate
     return NextResponse.json({ error: "Remove assigned products first", code: "CATEGORY_HAS_PRODUCTS" }, { status: 409 });
   }
   await prisma.category.delete({ where: { id: categoryId } });
+  invalidateStorefrontCache();
   return NextResponse.json({ success: true });
 }

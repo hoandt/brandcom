@@ -20,13 +20,15 @@ export function CollectionClient({ slug }: { slug: string }) {
   const locale = useLocale();
   const t = useTranslations("Homepage"); // using Homepage for some shared labels like viewAll
 
-  const { data, isLoading, isError } = useQuery<{ success: boolean; data: Product[]; currency?: string }>({
+  const { data, isLoading, isError } = useQuery<{ success: boolean; data: Product[]; currency?: string; cacheSeconds?: number }>({
     queryKey: ["collection", slug],
     queryFn: async () => {
       const res = await fetch(`/api/collections/${slug}`);
       if (!res.ok) throw new Error("Network response was not ok");
       return res.json();
     },
+    staleTime: 0,
+    refetchOnWindowFocus: false,
   });
 
   const products = data?.data || [];

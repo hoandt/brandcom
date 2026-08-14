@@ -51,7 +51,7 @@ export function ProductClient({ product, details }: ProductClientProps) {
       if (!response.ok) throw new Error("Failed to load store settings");
       return response.json();
     },
-    staleTime: 5 * 60_000,
+    staleTime: 0,
     refetchOnWindowFocus: false,
   });
   const currency = storeSettingsData?.settings.currency;
