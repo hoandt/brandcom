@@ -255,12 +255,7 @@ export async function PUT(
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
-    const currentImageByUrl = new Map(
-      currentProduct.images.map((image) => [image.url, image]),
-    );
-    const existingImages = submittedExistingImages.filter((url) =>
-      currentImageByUrl.has(url),
-    );
+    const existingImages = submittedExistingImages;
     const allImageUrls = [...new Set([...existingImages, ...newImageUrls])];
     let selectedMainImageUrl: string | undefined;
     if (
