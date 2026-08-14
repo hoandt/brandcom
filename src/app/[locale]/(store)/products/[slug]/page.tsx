@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { ProductClient } from "./product-client";
 import { unstable_cache } from "next/cache";
 import type { Metadata } from "next";
+import { brandConfig } from "@/lib/brand-config";
 import { marked } from "marked";
 import { getCategoryPath } from "@/lib/categories";
 import { getTranslations } from "next-intl/server";
@@ -114,7 +115,7 @@ export default async function ProductPage({ params }: Props) {
       }))
     }
   };
-  const siteUrl = (process.env.FRONTEND_URL || "https://auria.fit").replace(/\/$/, "");
+  const siteUrl = brandConfig.siteUrl.replace(/\/$/, "");
   const breadcrumbJsonLd = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",

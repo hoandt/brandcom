@@ -28,9 +28,9 @@ export async function FeaturedCategories({ locale }: { locale: string }) {
         {categories.map((category) => (
           <Link key={category.id} href={`/${locale}/categories/${category.slug}`} className="group block min-w-0">
             <div className="relative overflow-hidden border bg-muted/30 aspect-square">
-              {category.imageUrl ? (
+              {category.heroImageUrl ? (
                 <Image 
-                  src={category.imageUrl} 
+                  src={category.heroImageUrl} 
                   alt={category.name} 
                   fill 
                   sizes="(max-width: 768px) 50vw, 25vw" 

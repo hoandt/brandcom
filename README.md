@@ -16,6 +16,31 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Launching another brand
+
+The storefront is designed to be deployed once per brand from the same codebase. Give each deployment its own database and configure its identity with environment variables:
+
+```env
+# Used in the browser for the logo, metadata, and cart namespace.
+NEXT_PUBLIC_STORE_NAME="Your Brand"
+NEXT_PUBLIC_STORE_TAGLINE="Your brand promise"
+NEXT_PUBLIC_STORE_LOGO_URL="/your-brand-logo.svg"
+NEXT_PUBLIC_SITE_URL="https://yourbrand.example"
+NEXT_PUBLIC_CART_STORAGE_KEY="your-brand-cart"
+
+# Initial database-backed store settings. These can later be edited in Admin > Settings.
+DEFAULT_TENANT_ID="your-brand"
+DEFAULT_STORE_NAME="Your Brand"
+DEFAULT_LEGAL_NAME="Your Brand Company Ltd"
+DEFAULT_STORE_TAGLINE="Your brand promise"
+DEFAULT_SUPPORT_EMAIL="support@yourbrand.example"
+DEFAULT_ORDER_PREFIX="YB"
+```
+
+Put a local logo in `public/` and use a root-relative URL such as `/your-brand-logo.svg`, or use an absolute CDN URL. If `NEXT_PUBLIC_STORE_LOGO_URL` is omitted, non-Auria brands receive a text wordmark; the original Auria deployment keeps its existing SVG logo.
+
+Products, categories, content pages, orders, and store settings live in the configured database. Use a separate database for a fully independent brand catalog, then add products through the admin area or the supported import flow. Changing `NEXT_PUBLIC_CART_STORAGE_KEY` prevents carts from colliding when two brands share a parent domain.
+
 ## Zalo phone OTP service
 
 Vietnamese checkout authenticates customers through a server-side OTP service. Configure these values only in the server environment; never expose them through `NEXT_PUBLIC_*` variables.

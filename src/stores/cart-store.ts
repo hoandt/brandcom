@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { brandConfig } from '@/lib/brand-config';
 
 export type CartItem = {
   variantId: string;
@@ -53,7 +54,7 @@ export const useCartStore = create<CartState>()(
       clearCart: () => set({ items: [] }),
     }),
     {
-      name: 'auria-cart-storage',
+      name: brandConfig.cartStorageKey,
     }
   )
 );

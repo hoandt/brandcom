@@ -1,12 +1,13 @@
 import { prisma } from "@/lib/prisma";
+import { brandConfig } from "@/lib/brand-config";
 
 export const DEFAULT_TENANT_ID = process.env.DEFAULT_TENANT_ID || "default-tenant";
 
 export const DEFAULT_STORE_SETTINGS = {
   tenantId: DEFAULT_TENANT_ID,
-  storeName: process.env.DEFAULT_STORE_NAME || "AURIA",
+  storeName: process.env.DEFAULT_STORE_NAME || brandConfig.name,
   legalName: process.env.DEFAULT_LEGAL_NAME || "AURIA VN",
-  tagline: process.env.DEFAULT_STORE_TAGLINE || "Premium quality products for modern living.",
+  tagline: process.env.DEFAULT_STORE_TAGLINE || brandConfig.tagline,
   supportEmail: process.env.DEFAULT_SUPPORT_EMAIL || "support@auria.vn",
   supportPhone: process.env.DEFAULT_SUPPORT_PHONE || "",
   defaultLocale: process.env.DEFAULT_LOCALE || "vi",

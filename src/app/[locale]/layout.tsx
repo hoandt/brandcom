@@ -11,6 +11,7 @@ import Providers from "@/components/providers";
 import NextTopLoader from 'nextjs-toploader';
 import { Suspense } from "react";
 import { MarketingPixels } from "@/components/analytics/marketing-pixels";
+import { brandConfig } from "@/lib/brand-config";
 
 const oldStandardTT = Old_Standard_TT({
   weight: ["400", "700"],
@@ -19,8 +20,13 @@ const oldStandardTT = Old_Standard_TT({
 });
 
 export const metadata: Metadata = {
-  title: "Auria Store",
-  description: "Premium essentials designed for the modern lifestyle.",
+  metadataBase: new URL(brandConfig.siteUrl),
+  title: {
+    default: brandConfig.name,
+    template: `%s | ${brandConfig.name}`,
+  },
+  description: brandConfig.tagline,
+  applicationName: brandConfig.name,
 };
 
 type Props = {
