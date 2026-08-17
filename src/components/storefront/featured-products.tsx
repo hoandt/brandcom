@@ -13,8 +13,11 @@ export async function FeaturedProducts({ locale }: { locale: string }) {
   
   const storeSettings = await getStoreSettings()
   
-  // Fetch dynamic component config
-  const config = await getDynamicComponent<FeaturedProductsComponent>("home-featured-products")
+  // Fetch dynamic component config - try 'featured-products' first, fallback to 'home-featured-products'
+  let config = await getDynamicComponent<FeaturedProductsComponent>("featured-products")
+  if (!config) {
+    config = await getDynamicComponent<FeaturedProductsComponent>("home-featured-products")
+  }
   const title = config?.title || t("newArrivals")
   const subtitle = config?.subtitle || t("newArrivalsSubtitle")
   const displayType = config?.displayType || "latest"
