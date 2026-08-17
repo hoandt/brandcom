@@ -190,18 +190,20 @@ function FontCombobox({ value, onChange, fonts, isLoading, defaultFont }: any) {
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className="w-full justify-between h-9 rounded-md bg-transparent px-3 font-normal"
-          disabled={isLoading}
-        >
-          {value || defaultFont}
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
+      <PopoverTrigger
+        render={
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className="w-full justify-between h-9 rounded-md bg-transparent px-3 font-normal"
+            disabled={isLoading}
+          >
+            {value || defaultFont}
+            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        }
+      />
       <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
         <Command shouldFilter={false}>
           <CommandInput placeholder="Search font..." value={search} onValueChange={setSearch} />
