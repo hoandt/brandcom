@@ -418,7 +418,7 @@ function ThemeBuilder({ value, onChange }: { value: any, onChange: (val: any) =>
 // FEATURED PRODUCTS BUILDER
 // ----------------------------------------------------
 function FeaturedProductsBuilder({ value, onChange }: { value: any, onChange: (val: any) => void }) {
-  const data = value || { title: "", subtitle: "", displayType: "latest", productIds: [] };
+  const data = value || { title: "", subtitle: "", displayType: "latest", productIds: [], order: 0 };
 
   const { data: apiData, isLoading } = useQuery({
     queryKey: ["admin-products"],
@@ -460,6 +460,16 @@ function FeaturedProductsBuilder({ value, onChange }: { value: any, onChange: (v
             <option value="latest">Latest Arrivals</option>
             <option value="manual">Manual Selection</option>
           </select>
+        </div>
+
+        <div className="space-y-2 col-span-2">
+          <Label>Order (Position on Homepage)</Label>
+          <Input 
+            type="number"
+            value={data.order ?? 0} 
+            onChange={(e) => onChange({ ...data, order: parseInt(e.target.value) || 0 })}
+            placeholder="0"
+          />
         </div>
         
         {data.displayType === "manual" && (

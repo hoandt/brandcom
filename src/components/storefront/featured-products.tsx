@@ -8,16 +8,11 @@ import { getStoreSettings } from "@/lib/store-settings"
 import { getDynamicComponent, type FeaturedProductsComponent } from "@/lib/dynamic-components"
 import { storefrontCache } from "@/lib/storefront-cache"
 
-export async function FeaturedProducts({ locale }: { locale: string }) {
+export async function FeaturedProducts({ locale, config }: { locale: string, config?: FeaturedProductsComponent }) {
   const t = await getTranslations("Homepage")
   
   const storeSettings = await getStoreSettings()
   
-  // Fetch dynamic component config - try 'featured-products' first, fallback to 'home-featured-products'
-  let config = await getDynamicComponent<FeaturedProductsComponent>("featured-products")
-  if (!config) {
-    config = await getDynamicComponent<FeaturedProductsComponent>("home-featured-products")
-  }
   const title = config?.title || t("newArrivals")
   const subtitle = config?.subtitle || t("newArrivalsSubtitle")
   const displayType = config?.displayType || "latest"

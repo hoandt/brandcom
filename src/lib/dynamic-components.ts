@@ -7,6 +7,7 @@ export type FeaturedProductsComponent = {
   subtitle: string;
   displayType: 'latest' | 'manual';
   productIds: string[];
+  order?: number;
 };
 
 let cachedComponents: Record<string, { data: any; expiresAt: number }> = {};
@@ -52,4 +53,24 @@ export async function getDynamicComponent<T = any>(code: string): Promise<T | nu
   }
 
   return null;
+}
+
+export async function getDynamicComponentsByType<T = any>(type: string): Promise<{code: string, data: T}[]> {
+  try {
+    if (!prisma || !prisma.dynamicComponent) {
+      return [];
+    }
+
+    const components = await prisma.dynamicComponent.findMany({
+      where: { type, isActive: true },
+    });
+
+    return components.map(c => ({
+      code: c.code,
+      data: c.content as unknown as T
+    }));
+  } catch (error) {
+    console.error(`[GET_DYNAMIC_COMPONENTS_BY_TYPE_ERROR:${type}]`, error);
+    return [];
+  }
 }
