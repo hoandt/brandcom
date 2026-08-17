@@ -8,7 +8,7 @@ import { storefrontCache } from "@/lib/storefront-cache"
 
 export async function FeaturedCategories({ locale }: { locale: string }) {
   const t = await getTranslations("Homepage")
-  
+
   const settings = await getStoreSettings()
   const categories = await storefrontCache("categories:featured", settings.categoryCacheSeconds, () =>
     prisma.category.findMany({
@@ -21,7 +21,7 @@ export async function FeaturedCategories({ locale }: { locale: string }) {
   if (categories.length === 0) return null
 
   return (
-    <section className="storefront-container py-12 lg:py-24">
+    <section className="storefront-container py-6 lg:py-6">
       <div className="flex items-end justify-between mb-8 lg:mb-12">
         <div>
           <h2 className="text-2xl md:text-3xl font-heading uppercase tracking-widest mb-2">Shop by Category</h2>
@@ -34,12 +34,12 @@ export async function FeaturedCategories({ locale }: { locale: string }) {
           <Link key={category.id} href={`/${locale}/categories/${category.slug}`} className="group block min-w-0">
             <div className="relative overflow-hidden border bg-muted/30 aspect-square">
               {category.heroImageUrl ? (
-                <Image 
-                  src={category.heroImageUrl} 
-                  alt={category.name} 
-                  fill 
-                  sizes="(max-width: 768px) 50vw, 25vw" 
-                  className="object-cover transition-transform duration-700 group-hover:scale-[1.03]" 
+                <Image
+                  src={category.heroImageUrl}
+                  alt={category.name}
+                  fill
+                  sizes="(max-width: 768px) 50vw, 25vw"
+                  className="object-cover transition-transform duration-700 group-hover:scale-[1.03]"
                 />
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center bg-muted/40">
@@ -64,7 +64,7 @@ export async function FeaturedCategories({ locale }: { locale: string }) {
 
 export function FeaturedCategoriesSkeleton() {
   return (
-    <section className="storefront-container py-12 lg:py-24">
+    <section className="storefront-container py-6 lg:py-6">
       <div className="flex items-end justify-between mb-8 lg:mb-12">
         <div className="space-y-4">
           <div className="h-8 w-48 bg-secondary/50 animate-pulse rounded-md" />

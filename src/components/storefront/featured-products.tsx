@@ -10,9 +10,9 @@ import { storefrontCache } from "@/lib/storefront-cache"
 
 export async function FeaturedProducts({ locale, config }: { locale: string, config?: FeaturedProductsComponent }) {
   const t = await getTranslations("Homepage")
-  
+
   const storeSettings = await getStoreSettings()
-  
+
   const title = config?.title || t("newArrivals")
   const subtitle = config?.subtitle || t("newArrivalsSubtitle")
   const displayType = config?.displayType || "latest"
@@ -49,7 +49,7 @@ export async function FeaturedProducts({ locale, config }: { locale: string, con
   const currency = storeSettings.currency
 
   return (
-    <section className="storefront-container py-24">
+    <section className="storefront-container py-6">
       <div className="flex items-end justify-between mb-12">
         <div>
           <h2 className="text-2xl md:text-3xl font-heading uppercase tracking-widest mb-2">{title}</h2>
@@ -70,14 +70,14 @@ export async function FeaturedProducts({ locale, config }: { locale: string, con
             imagePlaceholder={t("imagePlaceholder")}
           />
         ))}
-        
+
         {sortedProducts.length === 0 && (
           <div className="col-span-full text-center py-32 text-muted-foreground border border-dashed">
             <span className="font-heading uppercase tracking-widest">{t("noProducts")}</span>
           </div>
         )}
       </div>
-      
+
       <div className="mt-12 md:hidden flex justify-center">
         <Button
           variant="outline"
@@ -93,7 +93,7 @@ export async function FeaturedProducts({ locale, config }: { locale: string, con
 
 export function FeaturedProductsSkeleton() {
   return (
-    <section className="storefront-container py-24">
+    <section className="storefront-container py-6">
       <div className="flex items-end justify-between mb-12">
         <div className="space-y-4">
           <div className="h-8 w-48 bg-secondary/50 animate-pulse rounded-md" />

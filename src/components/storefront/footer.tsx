@@ -32,7 +32,7 @@ export function Footer({ locale, dynamicFooter, logoUrl }: FooterProps) {
 
   return (
     <footer className="border-t bg-muted/20">
-      <div className="storefront-container py-12">
+      <div className="storefront-container py-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="space-y-4">
             <Link href={`/${locale}`} className="inline-block">

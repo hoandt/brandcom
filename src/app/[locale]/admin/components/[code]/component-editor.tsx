@@ -323,7 +323,7 @@ function TopbarBuilder({ value, onChange }: { value: any, onChange: (val: any) =
 // THEME BUILDER
 // ----------------------------------------------------
 function ThemeBuilder({ value, onChange }: { value: any, onChange: (val: any) => void }) {
-  const theme = value || { primaryColor: "#e11d48", fontSans: "TikTok Sans", fontHeading: "Old Standard TT", radius: "1rem", logoUrl: "" }
+  const theme = value || { primaryColor: "#e11d48", secondaryColor: "#f4f4f5", typographyColor: "#18181b", fontSans: "TikTok Sans", fontHeading: "Old Standard TT", radius: "1rem", logoUrl: "" }
 
   const updateTheme = (key: string, val: string) => {
     onChange({ ...theme, [key]: val })
@@ -356,6 +356,40 @@ function ThemeBuilder({ value, onChange }: { value: any, onChange: (val: any) =>
             <Input 
               value={theme.primaryColor || "#e11d48"} 
               onChange={(e) => updateTheme("primaryColor", e.target.value)} 
+              className="font-mono text-sm"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label className="text-xs font-bold uppercase text-muted-foreground">Secondary Color</Label>
+          <div className="flex items-center gap-3">
+            <input 
+              type="color" 
+              value={theme.secondaryColor || "#f4f4f5"} 
+              onChange={(e) => updateTheme("secondaryColor", e.target.value)}
+              className="h-10 w-20 cursor-pointer border-0 p-1 bg-transparent"
+            />
+            <Input 
+              value={theme.secondaryColor || "#f4f4f5"} 
+              onChange={(e) => updateTheme("secondaryColor", e.target.value)} 
+              className="font-mono text-sm"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label className="text-xs font-bold uppercase text-muted-foreground">Typography (Text) Color</Label>
+          <div className="flex items-center gap-3">
+            <input 
+              type="color" 
+              value={theme.typographyColor || "#18181b"} 
+              onChange={(e) => updateTheme("typographyColor", e.target.value)}
+              className="h-10 w-20 cursor-pointer border-0 p-1 bg-transparent"
+            />
+            <Input 
+              value={theme.typographyColor || "#18181b"} 
+              onChange={(e) => updateTheme("typographyColor", e.target.value)} 
               className="font-mono text-sm"
             />
           </div>

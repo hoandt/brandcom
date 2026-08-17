@@ -851,7 +851,7 @@ export default function CheckoutPage() {
             </div>{/* end left col */}
 
             {/* ══ RIGHT COLUMN (Amazon-style Sticky Summary Sidebar) ══ */}
-            <div className="lg:sticky lg:top-28 self-start space-y-3">
+            <div className="lg:sticky lg:top-28 xs:self-start space-y-3">
 
               {/* Order Summary Card */}
               <Section>
@@ -973,27 +973,7 @@ export default function CheckoutPage() {
 
           </div>{/* end grid */}
 
-          {/* Mobile: trust badges */}
-          <div className="lg:hidden mt-3">
-            <div className="bg-white dark:bg-neutral-900 rounded-2xl shadow-[0_2px_16px_rgba(0,0,0,0.06)] px-4 py-4">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-[11px] font-black uppercase tracking-[0.1em] text-foreground/70">
-                  {locale === "vi" ? "Bảo vệ đơn hàng" : `${storeName} Protections`}
-                </span>
-                <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
-              </div>
-              <div className="grid grid-cols-4 gap-3">
-                {trustBadges.map(({ icon: Icon, label }) => (
-                  <div key={label} className="flex flex-col items-center gap-1.5 text-center">
-                    <div className="w-10 h-10 rounded-xl bg-muted/50 flex items-center justify-center">
-                      <Icon className="w-4 h-4 text-foreground/60" />
-                    </div>
-                    <p className="text-[9px] text-muted-foreground font-medium leading-tight whitespace-pre-line">{label}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+
 
         </div>
       </form>
