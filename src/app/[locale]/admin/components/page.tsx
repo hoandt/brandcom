@@ -26,7 +26,7 @@ export default async function AdminComponentsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Dynamic Components</h1>
-          <p className="text-xs text-muted-foreground">Manage your store's dynamic UI components like menus and footers.</p>
+          <p className="text-xs text-muted-foreground">Manage your store&apos;s dynamic UI components like menus and footers.</p>
         </div>
         <Button render={<Link href="/admin/components/new" />} className="h-9 rounded-none px-4 text-xs uppercase font-bold tracking-wider">
           Create Component

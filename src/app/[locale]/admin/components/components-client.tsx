@@ -1,10 +1,9 @@
 "use client"
 
-import { useState } from "react"
 import Link from "next/link"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
-import { Eye, Edit, Trash } from "lucide-react"
+import { Edit, Trash } from "lucide-react"
 
 type ComponentType = {
   id: string

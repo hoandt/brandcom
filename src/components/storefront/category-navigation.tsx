@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState, useRef } from "react";
-import { createPortal } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, ChevronDown, RefreshCw, X } from "lucide-react";
 import Image from "next/image";
