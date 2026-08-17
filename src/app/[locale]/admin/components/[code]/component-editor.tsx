@@ -415,6 +415,86 @@ function ThemeBuilder({ value, onChange }: { value: any, onChange: (val: any) =>
 }
 
 // ----------------------------------------------------
+// FEATURED PRODUCTS BUILDER
+// ----------------------------------------------------
+function FeaturedProductsBuilder({ value, onChange }: { value: any, onChange: (val: any) => void }) {
+  const data = value || { title: "", subtitle: "", displayType: "latest", productIds: [] };
+
+  const { data: apiData, isLoading } = useQuery({
+    queryKey: ["admin-products"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/products")
+      if (!res.ok) throw new Error("Failed to load products")
+      return res.json()
+    }
+  })
+  
+  const products = apiData?.products || []
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Title</Label>
+          <Input 
+            value={data.title || ""} 
+            onChange={(e) => onChange({ ...data, title: e.target.value })}
+            placeholder="e.g. Featured Products"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Subtitle</Label>
+          <Input 
+            value={data.subtitle || ""} 
+            onChange={(e) => onChange({ ...data, subtitle: e.target.value })}
+            placeholder="e.g. Check out our best sellers"
+          />
+        </div>
+        <div className="space-y-2 col-span-2">
+          <Label>Display Logic</Label>
+          <select
+            value={data.displayType || "latest"}
+            onChange={(e) => onChange({ ...data, displayType: e.target.value, productIds: [] })}
+            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <option value="latest">Latest Arrivals</option>
+            <option value="manual">Manual Selection</option>
+          </select>
+        </div>
+        
+        {data.displayType === "manual" && (
+          <div className="space-y-2 col-span-2">
+            <Label>Select Products</Label>
+            <div className="border bg-background p-4 max-h-64 overflow-y-auto space-y-3 rounded-md">
+              {isLoading ? <p className="text-sm text-muted-foreground">Loading products...</p> : products.length === 0 ? <p className="text-sm text-muted-foreground">No products found.</p> : products.map((p: any) => (
+                <label key={p.id} className="flex items-center gap-3 text-sm cursor-pointer hover:bg-muted/50 p-2 rounded-md transition-colors">
+                  <input 
+                    type="checkbox" 
+                    className="h-4 w-4 rounded-sm border-primary text-primary focus:ring-primary"
+                    checked={data.productIds?.includes(p.id) || false} 
+                    onChange={(e) => {
+                      const currentIds = data.productIds || []
+                      const newIds = e.target.checked 
+                        ? [...currentIds, p.id] 
+                        : currentIds.filter((id: string) => id !== p.id)
+                      onChange({ ...data, productIds: newIds })
+                    }} 
+                  />
+                  <div className="flex flex-col">
+                    <span className="font-medium">{p.name}</span>
+                    <span className="text-xs text-muted-foreground">Variants: {p.variants?.length || 0}</span>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ----------------------------------------------------
 // EDITOR COMPONENT
 // ----------------------------------------------------
 export function ComponentEditor({ initialData }: { initialData: ComponentType | null }) {
@@ -554,6 +634,11 @@ export function ComponentEditor({ initialData }: { initialData: ComponentType | 
           />
         ) : formData.type === "theme-settings" ? (
           <ThemeBuilder
+            value={formData.content}
+            onChange={(val) => setFormData({ ...formData, content: val })}
+          />
+        ) : formData.type === "featured-products" ? (
+          <FeaturedProductsBuilder
             value={formData.content}
             onChange={(val) => setFormData({ ...formData, content: val })}
           />

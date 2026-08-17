@@ -5,17 +5,35 @@ import { ArrowRight } from "lucide-react"
 import { getTranslations } from "next-intl/server"
 import { ProductCard } from "./product-card"
 import { getStoreSettings } from "@/lib/store-settings"
+import { getDynamicComponent, type FeaturedProductsComponent } from "@/lib/dynamic-components"
 import { storefrontCache } from "@/lib/storefront-cache"
 
 export async function FeaturedProducts({ locale }: { locale: string }) {
   const t = await getTranslations("Homepage")
   
   const storeSettings = await getStoreSettings()
-  const products = await storefrontCache("products:featured", storeSettings.collectionCacheSeconds, () =>
+  
+  // Fetch dynamic component config
+  const config = await getDynamicComponent<FeaturedProductsComponent>("home-featured-products")
+  const title = config?.title || t("newArrivals")
+  const subtitle = config?.subtitle || t("newArrivalsSubtitle")
+  const displayType = config?.displayType || "latest"
+  const productIds = config?.productIds || []
+
+  // Define where clause based on config
+  const whereClause: any = { status: "ACTIVE" }
+  if (displayType === "manual" && productIds.length > 0) {
+    whereClause.id = { in: productIds }
+  }
+
+  // Cache key varies by config type to ensure updates propagate correctly
+  const cacheKey = `products:featured:${displayType}:${productIds.join(',')}`
+
+  const products = await storefrontCache(cacheKey, storeSettings.collectionCacheSeconds, () =>
     prisma.product.findMany({
-      where: { status: "ACTIVE" },
-      take: 4,
-      orderBy: { createdAt: 'desc' },
+      where: whereClause,
+      take: displayType === "manual" ? productIds.length : 4,
+      orderBy: displayType === "latest" ? { createdAt: 'desc' } : undefined,
       include: {
         variants: { where: { isActive: true }, orderBy: { price: "asc" } },
         images: { orderBy: { position: 'asc' }, take: 2 },
@@ -25,14 +43,19 @@ export async function FeaturedProducts({ locale }: { locale: string }) {
     })
   )
 
+  // If manual, we should ideally sort them in the exact order selected by the admin
+  const sortedProducts = displayType === "manual" && productIds.length > 0
+    ? products.sort((a, b) => productIds.indexOf(a.id) - productIds.indexOf(b.id))
+    : products
+
   const currency = storeSettings.currency
 
   return (
     <section className="storefront-container py-24">
       <div className="flex items-end justify-between mb-12">
         <div>
-          <h2 className="text-2xl md:text-3xl font-heading uppercase tracking-widest mb-2">{t("newArrivals")}</h2>
-          <p className="text-muted-foreground font-light">{t("newArrivalsSubtitle")}</p>
+          <h2 className="text-2xl md:text-3xl font-heading uppercase tracking-widest mb-2">{title}</h2>
+          <p className="text-muted-foreground font-light">{subtitle}</p>
         </div>
         <Link href={`/${locale}/collections/all`} className="hidden md:flex items-center text-sm font-heading uppercase tracking-widest font-medium hover:text-foreground/70 transition-colors">
           {t("viewAll")} <ArrowRight className="ml-2 h-4 w-4" />
@@ -40,7 +63,7 @@ export async function FeaturedProducts({ locale }: { locale: string }) {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-        {products.map((product) => (
+        {sortedProducts.map((product) => (
           <ProductCard
             key={product.id}
             product={product}
@@ -50,7 +73,7 @@ export async function FeaturedProducts({ locale }: { locale: string }) {
           />
         ))}
         
-        {products.length === 0 && (
+        {sortedProducts.length === 0 && (
           <div className="col-span-full text-center py-32 text-muted-foreground border border-dashed">
             <span className="font-heading uppercase tracking-widest">{t("noProducts")}</span>
           </div>

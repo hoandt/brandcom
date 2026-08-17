@@ -2,6 +2,13 @@ import { prisma } from "@/lib/prisma";
 
 export type ComponentData<T = any> = T;
 
+export type FeaturedProductsComponent = {
+  title: string;
+  subtitle: string;
+  displayType: 'latest' | 'manual';
+  productIds: string[];
+};
+
 let cachedComponents: Record<string, { data: any; expiresAt: number }> = {};
 const CACHE_TTL_MS = process.env.NODE_ENV === "development" ? 0 : 5 * 60_000; // 5 minutes in-memory cache in production
 
