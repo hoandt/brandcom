@@ -113,11 +113,11 @@ export function ProductVouchers({ productId }: { productId: string }) {
             setOpen(true);
           }
         }}
-        className={`group relative flex ${isCompact ? 'w-full' : 'w-[280px] cursor-pointer'} shrink-0 snap-start items-stretch overflow-hidden rounded-md border border-border/90 bg-card shadow-[0_1px_2px_rgba(39,31,29,0.06),0_5px_14px_rgba(39,31,29,0.06)] transition-all hover:border-primary/30 hover:shadow-[0_2px_4px_rgba(39,31,29,0.07),0_8px_20px_rgba(39,31,29,0.08)]`}
+        className={`group relative flex ${isCompact ? 'w-full' : 'w-[280px] cursor-pointer'} shrink-0 snap-start items-stretch overflow-hidden rounded-md border border-border bg-card shadow-[0_1px_2px_rgba(39,31,29,0.06),0_5px_14px_rgba(39,31,29,0.06)] transition-all hover:border-border/80 hover:shadow-[0_2px_4px_rgba(39,31,29,0.07),0_8px_20px_rgba(39,31,29,0.08)]`}
       >
         {/* Left Stub */}
-        <div className="flex w-[68px] shrink-0 flex-col items-center justify-center border-r border-border/80 bg-primary/[0.045] px-2 py-3 text-center text-primary">
-          <div className="mb-1.5 flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
+        <div className="flex w-[68px] shrink-0 flex-col items-center justify-center border-r border-border/80 bg-muted/50 px-2 py-3 text-center text-foreground/80">
+          <div className="mb-1.5 flex h-8 w-8 items-center justify-center rounded-full bg-background border">
             {isShipping ? <Truck className="h-4 w-4" strokeWidth={1.7} /> : <Tag className="h-4 w-4" strokeWidth={1.7} />}
           </div>
           <span className="text-[8px] font-bold uppercase leading-tight tracking-[0.08em]">{label}</span>
@@ -125,7 +125,7 @@ export function ProductVouchers({ productId }: { productId: string }) {
 
         {/* Middle Content */}
         <div className="flex flex-1 flex-col justify-center px-2.5 py-2 min-w-0">
-          <span className="text-sm font-bold leading-tight text-primary">{benefitText}</span>
+          <span className="text-sm font-bold leading-tight text-foreground">{benefitText}</span>
           <span className="mt-0.5 text-[9px] text-muted-foreground">
             {minSpend}
           </span>

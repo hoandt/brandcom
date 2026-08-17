@@ -7,7 +7,7 @@ import { useCartStore } from "@/stores/cart-store";
 import { useTranslations, useLocale } from "next-intl";
 import { useRouter } from "next/navigation";
 import { formatPrice } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, ShoppingBag } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, ShoppingBag } from "lucide-react";
 import { ProductVouchers } from "@/components/store/product-vouchers";
 import { useQuery } from "@tanstack/react-query";
 import { ProductRatingInline, ProductReviews } from "@/components/storefront/product-reviews";
@@ -62,6 +62,10 @@ export function ProductClient({ product, details }: ProductClientProps) {
   });
   const [activeImageIdx, setActiveImageIdx] = useState(0);
   const swipeStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  // Fullscreen Lightbox State
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIdx, setLightboxIdx] = useState(0);
 
   const items = useCartStore((state) => state.items);
   const addItem = useCartStore((state) => state.addItem);
@@ -172,6 +176,18 @@ export function ProductClient({ product, details }: ProductClientProps) {
     else handlePrevImage();
   };
 
+  // Keyboard navigation for lightbox
+  useEffect(() => {
+    if (!lightboxOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setLightboxOpen(false);
+      if (e.key === "ArrowLeft") setLightboxIdx((prev) => (prev === 0 ? Math.min(allImages.length, 6) - 1 : prev - 1));
+      if (e.key === "ArrowRight") setLightboxIdx((prev) => (prev === Math.min(allImages.length, 6) - 1 ? 0 : prev + 1));
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [lightboxOpen, allImages.length]);
+
   return (
     <div className="flex w-full flex-col pb-24 lg:pb-10">
       <div className="flex flex-col items-start lg:grid lg:grid-cols-[7fr_6fr] lg:gap-x-0">
@@ -247,7 +263,15 @@ export function ProductClient({ product, details }: ProductClientProps) {
           <div className="order-1 hidden lg:grid w-full grid-cols-2">
             {displayImages.length > 0 ? (
               displayImages.slice(0, 6).map((img, idx) => (
-                <div key={idx} className="relative aspect-[3/4] w-full overflow-hidden bg-muted/40">
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => {
+                    setLightboxIdx(idx);
+                    setLightboxOpen(true);
+                  }}
+                  className="relative aspect-[3/4] w-full overflow-hidden bg-muted/40 cursor-zoom-in outline-none"
+                >
                   {isSelectedVariantOnSale && idx === 0 && (
                     <div className="absolute left-2 top-2 z-10 bg-foreground px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-background">
                       Sale
@@ -261,7 +285,7 @@ export function ProductClient({ product, details }: ProductClientProps) {
                     sizes="(max-width: 1024px) 50vw, 30vw"
                     priority={idx < 2}
                   />
-                </div>
+                </button>
               ))
             ) : (
               <div className="col-span-2 relative aspect-[3/4] w-full overflow-hidden bg-muted/40 flex items-center justify-center">
@@ -373,7 +397,7 @@ export function ProductClient({ product, details }: ProductClientProps) {
                         type="button"
                         onClick={() => handleVariantSelect(v.id)}
                         className={`relative min-w-0 border px-3 py-2.5 text-center transition-all ${isSelected
-                          ? "border-primary bg-primary/[0.04] text-primary"
+                          ? "border-foreground bg-foreground/5 text-foreground shadow-[inset_0_0_0_1px_var(--foreground)]"
                           : "border-border bg-background text-foreground/80 hover:border-foreground/40 hover:text-foreground"
                           } ${v.stock <= 0 ? "opacity-40 cursor-not-allowed" : ""}`}
                         disabled={v.stock <= 0}
@@ -581,6 +605,62 @@ export function ProductClient({ product, details }: ProductClientProps) {
           )}
         </div>
       </div>
+      {/* Fullscreen Lightbox (Desktop) */}
+      {lightboxOpen && allImages.length > 0 && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/95 backdrop-blur-sm animate-in fade-in duration-200">
+          <button
+            onClick={() => setLightboxOpen(false)}
+            className="absolute right-6 top-6 z-[110] flex h-12 w-12 items-center justify-center rounded-full bg-background/50 text-foreground hover:bg-background transition-colors"
+            aria-label="Close gallery"
+          >
+            <X className="h-6 w-6" />
+          </button>
+
+          {allImages.length > 1 && (
+            <button
+              onClick={() => setLightboxIdx((prev) => (prev === 0 ? Math.min(allImages.length, 6) - 1 : prev - 1))}
+              className="absolute left-6 top-1/2 z-[110] flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-background/50 text-foreground hover:bg-background transition-colors"
+              aria-label="Previous image"
+            >
+              <ChevronLeft className="h-6 w-6" />
+            </button>
+          )}
+
+          {allImages.length > 1 && (
+            <button
+              onClick={() => setLightboxIdx((prev) => (prev === Math.min(allImages.length, 6) - 1 ? 0 : prev + 1))}
+              className="absolute right-6 top-1/2 z-[110] flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-background/50 text-foreground hover:bg-background transition-colors"
+              aria-label="Next image"
+            >
+              <ChevronRight className="h-6 w-6" />
+            </button>
+          )}
+
+          <div className="relative flex h-full max-h-[90vh] w-full max-w-[90vw] items-center justify-center">
+            {allImages[lightboxIdx] && (
+              <Image
+                src={allImages[lightboxIdx].url}
+                alt={`${product.name} - Gallery Image ${lightboxIdx + 1}`}
+                fill
+                className="object-contain"
+                sizes="100vw"
+                priority
+              />
+            )}
+          </div>
+          
+          <div className="absolute bottom-6 left-1/2 flex -translate-x-1/2 gap-2">
+            {allImages.slice(0, 6).map((_, idx) => (
+              <button
+                key={idx}
+                onClick={() => setLightboxIdx(idx)}
+                className={`h-1.5 rounded-full transition-all duration-300 ${lightboxIdx === idx ? "w-8 bg-foreground" : "w-2 bg-foreground/30 hover:bg-foreground/60"}`}
+                aria-label={`Go to image ${idx + 1}`}
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
