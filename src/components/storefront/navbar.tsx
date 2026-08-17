@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
 import { Logo } from "@/components/ui/logo"
-import { Search, Menu, User, ChevronDown, Globe, X } from "lucide-react"
+import { Search, Menu, User, ChevronDown, Globe, X, ShoppingBag, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useTranslations, useLocale } from "next-intl"
 import { LanguageSwitcher } from "./language-switcher"
@@ -25,7 +25,7 @@ import { signOut } from "next-auth/react"
 import type { Session } from "next-auth"
 import { DesktopCategoryMenu, MobileCategoryMenu } from "./category-navigation"
 
-export function Navbar({ session }: { session: Session | null }) {
+export function Navbar({ session, dynamicMenu, logoUrl }: { session: Session | null; dynamicMenu?: any[]; logoUrl?: string }) {
   const [isScrolled, setIsScrolled] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
@@ -34,6 +34,7 @@ export function Navbar({ session }: { session: Session | null }) {
   const locale = useLocale()
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isCategoryOpen, setIsCategoryOpen] = useState(false)
 
   const switchLanguage = (newLocale: string) => {
     if (newLocale === locale) return;
@@ -74,8 +75,8 @@ export function Navbar({ session }: { session: Session | null }) {
   }, [isMobileMenuOpen])
 
   const isHomepage = pathname === `/${locale}` || pathname === "/"
-  const isTransparent = isHomepage && !isScrolled
-  const isShopActive = ["/collections/", "/categories/", "/products/"].some((segment) => pathname.includes(segment))
+  const isTransparent = isHomepage && !isScrolled && !isCategoryOpen
+  const isShopActive = ["/collections/", "/categories/", "/products/"].some((segment) => pathname.includes(segment)) || isCategoryOpen
 
   return (
     <header
@@ -89,12 +90,20 @@ export function Navbar({ session }: { session: Session | null }) {
         {/* Left Section: Logo & Desktop Links */}
         <div className="flex min-w-0 shrink items-center gap-6 xl:gap-10">
           <Link href={`/${locale}`} className="flex shrink-0 items-center">
-            <Logo className={`h-10 w-auto sm:h-11 lg:h-14 ${isTransparent ? "text-white" : "text-primary"}`} />
+            <Logo logoUrl={logoUrl} className={`h-10 w-auto sm:h-11 lg:h-14 ${isTransparent ? "text-white" : "text-primary"}`} />
           </Link>
 
           <nav className="hidden h-20 items-center gap-5 whitespace-nowrap text-[0.8rem] font-bold uppercase tracking-[0.12em] lg:flex xl:gap-8">
-            <DesktopCategoryMenu transparent={isTransparent} active={isShopActive} />
-            <Link href={`/${locale}/pages/about-us`} className={`${isTransparent ? "text-white/90 hover:text-white" : "text-muted-foreground hover:text-foreground"} border-b-2 border-transparent py-3 font-heading text-[0.85rem] font-bold uppercase tracking-[0.15em] outline-none transition-colors hover:border-current focus-visible:outline-none focus-visible:ring-0`}>{t("aboutUs")}</Link>
+            <DesktopCategoryMenu transparent={isTransparent} active={isShopActive} isOpen={isCategoryOpen} onOpenChange={setIsCategoryOpen} />
+            {dynamicMenu && Array.isArray(dynamicMenu) && dynamicMenu.length > 0 ? (
+              dynamicMenu.map((item, index) => (
+                <Link key={index} href={item.href.startsWith('/') && !item.href.startsWith(`/${locale}`) ? `/${locale}${item.href}` : item.href} className={`${isTransparent ? "text-white/90 hover:text-white" : "text-muted-foreground hover:text-foreground"} border-b-2 border-transparent py-3 font-heading text-[0.85rem] font-bold uppercase tracking-[0.15em] outline-none transition-colors hover:border-current focus-visible:outline-none focus-visible:ring-0`}>
+                  {item.label}
+                </Link>
+              ))
+            ) : (
+              <Link href={`/${locale}/pages/about-us`} className={`${isTransparent ? "text-white/90 hover:text-white" : "text-muted-foreground hover:text-foreground"} border-b-2 border-transparent py-3 font-heading text-[0.85rem] font-bold uppercase tracking-[0.15em] outline-none transition-colors hover:border-current focus-visible:outline-none focus-visible:ring-0`}>{t("aboutUs")}</Link>
+            )}
           </nav>
         </div>
 
@@ -129,43 +138,44 @@ export function Navbar({ session }: { session: Session | null }) {
               <DropdownMenu>
                 <DropdownMenuTrigger
                   render={
-                    <button aria-label={session.user.name || "Account"} className={`flex h-10 items-center gap-1 px-1.5 outline-none cursor-pointer rounded-none hover:bg-muted/10 ${isTransparent ? "text-white" : "text-foreground"}`}>
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden border border-primary/20 bg-primary/10 text-primary">
+                    <button aria-label={session.user.name || "Account"} className={`flex h-10 items-center gap-2 px-2 outline-none cursor-pointer rounded-full transition-colors hover:bg-muted/30 ${isTransparent ? "text-white hover:bg-white/20" : "text-foreground"}`}>
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border/50 bg-background text-foreground shadow-sm">
                         {session.user.image ? (
-                          <Image src={session.user.image} alt={session.user.name || "User"} width={32} height={32} unoptimized className="h-full w-full object-cover" />
+                          <Image src={session.user.image} alt={session.user.name || "User"} width={28} height={28} unoptimized className="h-full w-full object-cover" />
                         ) : (
                           <User className="h-4 w-4" />
                         )}
                       </div>
-                      <span className="hidden max-w-[100px] truncate text-xs font-medium xl:inline">{session.user.name}</span>
+                      <span className="hidden max-w-[100px] truncate text-xs font-bold xl:inline">{session.user.name}</span>
                       <ChevronDown className="hidden h-3.5 w-3.5 opacity-60 xl:block" />
                     </button>
                   }
                 />
-                <DropdownMenuContent align="end" className="w-44 rounded-none bg-card">
-                  <DropdownMenuItem className="rounded-none cursor-pointer text-xs" render={<Link href={`/${locale}/account/orders`} />}>
+                <DropdownMenuContent align="end" className="w-56 rounded-md bg-card p-1 shadow-lg border-border/50">
+                  <DropdownMenuItem className="cursor-pointer py-2.5 text-sm font-medium" render={<Link href={`/${locale}/account/orders`} />}>
+                    <ShoppingBag className="mr-2 h-4 w-4 text-muted-foreground" />
                     {tAccount("sidebarOrders") || "Đơn Mua"}
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="rounded-none cursor-pointer text-xs" render={<Link href={`/${locale}/account/profile`} />}>
+                  <DropdownMenuItem className="cursor-pointer py-2.5 text-sm font-medium" render={<Link href={`/${locale}/account/profile`} />}>
+                    <User className="mr-2 h-4 w-4 text-muted-foreground" />
                     {tAccount("sidebarProfile") || "Tài Khoản Của Tôi"}
                   </DropdownMenuItem>
 
-
                   {/* Language Selection inside Dropdown */}
                   <DropdownMenuSub>
-                    <DropdownMenuSubTrigger className="rounded-none text-xs cursor-pointer">
-                      <Globe className="w-3.5 h-3.5 mr-1" />
-                      <span>{tAccount("language") || "Ngôn ngữ"}</span>
-                      <span className="ml-auto text-muted-foreground text-[10px] mr-1">
+                    <DropdownMenuSubTrigger className="cursor-pointer py-2.5 text-sm font-medium flex items-center">
+                      <Globe className="mr-2 h-4 w-4 text-muted-foreground" />
+                      <span className="flex-1">{tAccount("language") || "Ngôn ngữ"}</span>
+                      <span className="text-[11px] text-muted-foreground">
                         {languages.find(l => l.code === locale)?.name}
                       </span>
                     </DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent className="rounded-none bg-card min-w-[120px]">
+                    <DropdownMenuSubContent className="rounded-md bg-card min-w-[140px] p-1 shadow-lg border-border/50">
                       {languages.map((lang) => (
                         <DropdownMenuItem
                           key={lang.code}
                           onClick={() => switchLanguage(lang.code)}
-                          className={`rounded-none text-xs cursor-pointer ${locale === lang.code ? "bg-accent text-accent-foreground" : ""}`}
+                          className={`cursor-pointer py-2.5 text-sm ${locale === lang.code ? "bg-accent text-accent-foreground font-medium" : ""}`}
                         >
                           {lang.name}
                         </DropdownMenuItem>
@@ -173,11 +183,12 @@ export function Navbar({ session }: { session: Session | null }) {
                     </DropdownMenuSubContent>
                   </DropdownMenuSub>
 
-                  <DropdownMenuSeparator />
+                  <DropdownMenuSeparator className="my-1" />
                   <DropdownMenuItem
-                    className="rounded-none cursor-pointer text-destructive text-xs focus:bg-destructive/5 focus:text-destructive"
+                    className="cursor-pointer py-2.5 text-sm font-medium text-destructive focus:bg-destructive/10 focus:text-destructive"
                     onClick={() => signOut({ callbackUrl: `/${locale}` })}
                   >
+                    <LogOut className="mr-2 h-4 w-4" />
                     {tAccount("signOut") || "Đăng Xuất"}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -216,7 +227,7 @@ export function Navbar({ session }: { session: Session | null }) {
                 className="fixed inset-0 z-[100] flex h-dvh w-screen flex-col overflow-hidden bg-background font-heading text-foreground animate-in fade-in duration-150 lg:hidden"
               >
                 <div className="storefront-container flex h-20 shrink-0 items-center border-b">
-                  <Link href={`/${locale}`} onClick={() => setIsMobileMenuOpen(false)}><Logo className="h-11 w-auto text-primary" /></Link>
+                  <Link href={`/${locale}`} onClick={() => setIsMobileMenuOpen(false)}><Logo logoUrl={logoUrl} className="h-11 w-auto text-primary" /></Link>
                   <span className="ml-auto mr-4 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{locale}</span>
                   <button type="button" onClick={() => setIsMobileMenuOpen(false)} className="flex h-11 w-11 items-center justify-center border outline-none hover:border-primary hover:text-primary focus-visible:border-primary" aria-label={t("closeMenu")}><X className="h-5 w-5" /></button>
                 </div>

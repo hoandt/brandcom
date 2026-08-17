@@ -65,7 +65,7 @@ export async function getStoreSettings(tenantId = DEFAULT_TENANT_ID) {
 
 export type PublicStoreSettings = Pick<
   Awaited<ReturnType<typeof getStoreSettings>>,
-  "tenantId" | "storeName" | "legalName" | "tagline" | "supportEmail" | "supportPhone" |
+  "tenantId" | "storeName" | "legalName" | "tagline" | "seoTitle" | "seoDescription" | "supportEmail" | "supportPhone" |
   "defaultLocale" | "currency" | "timezone" | "orderPrefix" | "fallbackShippingFee" | "lowStockThreshold" |
   "productCacheSeconds" | "collectionCacheSeconds" | "categoryCacheSeconds" | "storeSettingsCacheSeconds" |
   "nonCodDiscountEnabled" | "nonCodDiscountType" | "nonCodDiscountValue"

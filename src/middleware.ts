@@ -4,7 +4,8 @@ import { authConfig } from "./auth.config";
 
 const intlMiddleware = createMiddleware({
   locales: ['en', 'vi', 'th'],
-  defaultLocale: 'vi'
+  defaultLocale: 'vi',
+  localeDetection: false
 });
 
 const authMiddleware = NextAuth(authConfig).auth;

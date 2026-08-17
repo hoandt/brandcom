@@ -2,13 +2,15 @@ import * as React from "react"
 import { brandConfig, isDefaultAuriaBrand } from "@/lib/brand-config"
 
 
-export function Logo({ className, ...props }: React.SVGProps<SVGSVGElement>) {
-  if (!isDefaultAuriaBrand) {
-    if (brandConfig.logoUrl) {
+export function Logo({ className, logoUrl, ...props }: React.SVGProps<SVGSVGElement> & { logoUrl?: string }) {
+  const finalLogoUrl = logoUrl || brandConfig.logoUrl;
+
+  if (!isDefaultAuriaBrand || finalLogoUrl) {
+    if (finalLogoUrl) {
       return (
         // A normal image supports both local assets and brand-managed CDN URLs.
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={brandConfig.logoUrl} alt={brandConfig.name} className={className} />
+        <img src={finalLogoUrl} alt={brandConfig.name} className={className} />
       )
     }
 

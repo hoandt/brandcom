@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 
 type Settings = {
   tenantId: string; storeName: string; legalName: string | null; tagline: string | null;
+  seoTitle: string | null; seoDescription: string | null;
   supportEmail: string | null; supportPhone: string | null; defaultLocale: "vi" | "en" | "th";
   currency: string; timezone: string; orderPrefix: string; fallbackShippingFee: number;
   lowStockThreshold: number; productCacheSeconds: number; collectionCacheSeconds: number;
@@ -23,7 +24,7 @@ type Settings = {
 };
 
 const emptySettings: Settings = {
-  tenantId: "", storeName: "", legalName: "", tagline: "", supportEmail: "", supportPhone: "",
+  tenantId: "", storeName: "", legalName: "", tagline: "", seoTitle: "", seoDescription: "", supportEmail: "", supportPhone: "",
   defaultLocale: "vi", currency: "VND", timezone: "Asia/Ho_Chi_Minh", orderPrefix: "ORD",
   fallbackShippingFee: 30000, lowStockThreshold: 5, nonCodDiscountEnabled: true, nonCodDiscountType: "percentage",
   productCacheSeconds: 900, collectionCacheSeconds: 300, categoryCacheSeconds: 300, storeSettingsCacheSeconds: 300,
@@ -130,6 +131,8 @@ export default function AdminSettingsPage() {
         <Field label="Support email"><Input type="email" value={form.supportEmail || ""} onChange={(event) => setForm({ ...form, supportEmail: event.target.value })} /></Field>
         <Field label="Support phone"><Input value={form.supportPhone || ""} onChange={(event) => setForm({ ...form, supportPhone: event.target.value })} /></Field>
         <div className="md:col-span-2"><Field label="Tagline"><Input value={form.tagline || ""} onChange={(event) => setForm({ ...form, tagline: event.target.value })} /></Field></div>
+        <div className="md:col-span-2"><Field label="SEO Meta Title"><Input value={form.seoTitle || ""} onChange={(event) => setForm({ ...form, seoTitle: event.target.value })} placeholder="Optimized title for search engines" /></Field></div>
+        <div className="md:col-span-2"><Field label="SEO Meta Description"><Input value={form.seoDescription || ""} onChange={(event) => setForm({ ...form, seoDescription: event.target.value })} placeholder="Optimized description for search engines" /></Field></div>
       </SettingsSection>
 
       <SettingsSection id="cache" icon={Globe2} title="Storefront cache" description="Public storefront cache lifetimes in seconds. Use 0 to disable a cache. Checkout and signed-in areas are never cached.">

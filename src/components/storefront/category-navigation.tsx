@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, ChevronDown, RefreshCw, X } from "lucide-react";
@@ -78,11 +78,16 @@ function CategoryTabs({ roots, selectedId, onSelect }: { roots: NavigationTree[]
   );
 }
 
-export function DesktopCategoryMenu({ transparent, active }: { transparent: boolean; active: boolean }) {
+export function DesktopCategoryMenu({ transparent, active, isOpen, onOpenChange }: { transparent: boolean; active: boolean; isOpen?: boolean; onOpenChange?: (open: boolean) => void }) {
   const locale = useLocale();
   const t = useTranslations("Navbar");
   const query = useCategoryNavigation();
-  const [open, setOpen] = useState(false);
+  
+  // Keep internal state for fallback if not controlled
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = isOpen !== undefined ? isOpen : internalOpen;
+  const setOpen = onOpenChange || setInternalOpen;
+
   const [selectedId, setSelectedId] = useState("all");
   const roots = useMemo(() => buildCategoryTree(query.data?.categories ?? []), [query.data]);
   const images = useMemo(() => resolvedImages(roots), [roots]);
@@ -107,27 +112,53 @@ export function DesktopCategoryMenu({ transparent, active }: { transparent: bool
     };
   }, [open]);
 
+  // Using a timeout to prevent flickering when mouse moves between button and portal
+  const leaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleMouseEnter = () => {
+    if (leaveTimeoutRef.current) {
+      clearTimeout(leaveTimeoutRef.current);
+      leaveTimeoutRef.current = null;
+    }
+    setOpen(true);
+  };
+
+  const handleMouseLeave = () => {
+    leaveTimeoutRef.current = setTimeout(() => {
+      setOpen(false);
+    }, 150);
+  };
+
   return (
-    <>
+    <div 
+      onMouseEnter={handleMouseEnter} 
+      onMouseLeave={handleMouseLeave}
+      className="flex h-full items-center"
+    >
       <button
         type="button"
         aria-expanded={open}
         aria-controls="desktop-catalogue-menu"
-        onClick={() => setOpen(true)}
+        onClick={() => setOpen(!open)}
         className={`inline-flex items-center gap-1.5 border-b-2 py-3 font-heading text-[0.85rem] font-bold uppercase tracking-[0.15em] outline-none transition-colors focus:outline-none focus-visible:outline-none focus-visible:ring-0 ${activeBorder} ${linkColor}`}
       >
         {t("shop")}<ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
-      {open && typeof document !== "undefined" && createPortal(
+      {open && (
         <div
           id="desktop-catalogue-menu"
           role="dialog"
           aria-modal="true"
           aria-label={t("catalogueMenu")}
           onClick={() => setOpen(false)}
-          className="fixed inset-x-0 bottom-0 top-20 z-[100] bg-foreground/20 font-heading text-foreground backdrop-blur-[2px] animate-in fade-in duration-150"
+          className="absolute inset-x-0 top-[100%] h-[100vh] z-[100] bg-foreground/20 font-heading text-foreground backdrop-blur-[2px] animate-in fade-in duration-150"
         >
-          <div onClick={(event) => event.stopPropagation()} className="flex max-h-[min(72dvh,44rem)] w-full flex-col overflow-hidden border-b bg-background shadow-[0_18px_45px_rgba(39,31,29,0.16)] animate-in slide-in-from-top-2 duration-200">
+          <div 
+            onClick={(event) => event.stopPropagation()} 
+            onMouseEnter={handleMouseEnter} 
+            onMouseLeave={handleMouseLeave}
+            className="flex max-h-[min(72dvh,44rem)] w-full flex-col overflow-hidden border-b bg-background shadow-[0_18px_45px_rgba(39,31,29,0.16)] animate-in slide-in-from-top-2 duration-200"
+          >
             <header className="shrink-0 border-b bg-background">
               <div className="storefront-container flex items-center gap-8">
                 <div className="min-w-0 flex-1"><CategoryTabs roots={roots} selectedId={selectedId} onSelect={setSelectedId} /></div>
@@ -143,10 +174,9 @@ export function DesktopCategoryMenu({ transparent, active }: { transparent: bool
               {query.isLoading ? <CategoryLoadingGrid /> : query.isError ? <p className="border border-destructive/30 bg-destructive/5 p-5 text-sm text-destructive">{t("categoryLoadError")}</p> : items.length ? <div className="grid grid-cols-3 gap-x-4 gap-y-6 lg:grid-cols-5 xl:grid-cols-6">{items.map((item) => <CategoryCard key={item.id} item={item} imageUrl={images.get(item.id) ?? null} locale={locale} onNavigate={() => setOpen(false)} />)}</div> : <p className="py-16 text-center text-sm text-muted-foreground">{t("noCategories")}</p>}
             </main>
           </div>
-        </div>,
-        document.body,
+        </div>
       )}
-    </>
+    </div>
   );
 }
 

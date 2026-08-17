@@ -11,7 +11,7 @@ import {
   SidebarMenuItem,
   SidebarFooter,
 } from "@/components/ui/sidebar"
-import { Package, LayoutDashboard, ShoppingCart, Users, Tag, Settings, FileText, LogOut, ChevronUp, Warehouse, FolderTree, MessageSquareText, Truck } from "lucide-react"
+import { Package, LayoutDashboard, ShoppingCart, Users, Tag, Settings, FileText, LogOut, ChevronUp, Warehouse, FolderTree, MessageSquareText, Truck, Component, Palette, ExternalLink } from "lucide-react"
 import { signOut } from "next-auth/react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -80,6 +80,16 @@ const items = [
     url: "/admin/settings",
     icon: Settings,
   },
+  {
+    title: "Components",
+    url: "/admin/components",
+    icon: Component,
+  },
+  {
+    title: "Theme Settings",
+    url: "/admin/components/theme-settings",
+    icon: Palette,
+  },
 ]
 
 export function AppSidebar({ user }: { user?: { name?: string | null; email?: string | null; image?: string | null } }) {
@@ -101,7 +111,12 @@ export function AppSidebar({ user }: { user?: { name?: string | null; email?: st
     <Sidebar className="border-r border-border rounded-none">
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">{storeName} Admin</SidebarGroupLabel>
+          <div className="flex items-center justify-between px-2 mb-2">
+            <SidebarGroupLabel className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground px-0 mb-0">{storeName} Admin</SidebarGroupLabel>
+            <Link href={`/${locale}`} target="_blank" className="text-[9px] font-bold uppercase tracking-widest text-primary hover:underline flex items-center gap-1">
+              Storefront <ExternalLink className="w-2.5 h-2.5" />
+            </Link>
+          </div>
           <SidebarGroupContent>
             <SidebarMenu className="gap-0.5">
               {items.map((item) => (

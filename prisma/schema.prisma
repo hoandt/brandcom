@@ -18,6 +18,8 @@ model StoreSettings {
   storeName                 String
   legalName                 String?
   tagline                   String?
+  seoTitle                  String?
+  seoDescription            String?
   supportEmail              String?
   supportPhone              String?
   defaultLocale             String   @default("vi")
@@ -487,4 +489,15 @@ model ShippingRateCache {
 
   @@unique([carrier, province, district, ward, weightBand])
   @@index([carrier, province, district, ward, weightBand])
+}
+
+model DynamicComponent {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  type      String   // "menu", "footer", "hero", "featured-products", etc.
+  name      String   // e.g. "Main Menu", "Footer Section 1"
+  content   Json
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

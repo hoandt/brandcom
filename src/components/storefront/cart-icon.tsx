@@ -51,7 +51,7 @@ export function CartIcon({ isTransparent }: { isTransparent?: boolean }) {
     <Link
       href={`/${locale}/checkout`}
       aria-label={`${itemCount} ${itemCount === 1 ? "item" : "items"}, ${formatPrice(cartTotal, locale)}`}
-      className={`group flex h-10 items-center gap-2 rounded-full px-3 transition-all duration-300 ${
+      className={`group flex h-10 items-center gap-1.5 sm:gap-2 rounded-full px-2 sm:px-3 transition-all duration-300 ${
         isTransparent
           ? "bg-white/20 text-white hover:bg-white/30"
           : "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
@@ -63,10 +63,10 @@ export function CartIcon({ isTransparent }: { isTransparent?: boolean }) {
           {itemCount > 99 ? "99+" : itemCount}
         </span>
       </span>
-      <span className="whitespace-nowrap text-xs font-extrabold tracking-tight">
+      <span className="hidden sm:inline-flex whitespace-nowrap text-xs font-extrabold tracking-tight">
         {formatPrice(cartTotal, locale)}
       </span>
-      <ChevronRight className="h-3.5 w-3.5 shrink-0 opacity-75 transition-transform group-hover:translate-x-0.5" />
+      <ChevronRight className="hidden sm:block h-3.5 w-3.5 shrink-0 opacity-75 transition-transform group-hover:translate-x-0.5" />
     </Link>
   );
 }

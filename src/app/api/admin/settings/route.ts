@@ -10,6 +10,8 @@ const schema = z.object({
   storeName: z.string().trim().min(1).max(100),
   legalName: z.string().trim().max(160).nullable().optional(),
   tagline: z.string().trim().max(240).nullable().optional(),
+  seoTitle: z.string().trim().max(100).nullable().optional(),
+  seoDescription: z.string().trim().max(300).nullable().optional(),
   supportEmail: z.string().email().nullable().optional().or(z.literal("")),
   supportPhone: z.string().trim().max(30).nullable().optional(),
   defaultLocale: z.enum(["vi", "en", "th"]),
