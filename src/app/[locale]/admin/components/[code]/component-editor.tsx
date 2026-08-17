@@ -323,7 +323,7 @@ function TopbarBuilder({ value, onChange }: { value: any, onChange: (val: any) =
 // THEME BUILDER
 // ----------------------------------------------------
 function ThemeBuilder({ value, onChange }: { value: any, onChange: (val: any) => void }) {
-  const theme = value || { primaryColor: "#e11d48", secondaryColor: "#f4f4f5", typographyColor: "#18181b", fontSans: "TikTok Sans", fontHeading: "Old Standard TT", radius: "1rem", logoUrl: "" }
+  const theme = value || { primaryColor: "#e11d48", secondaryColor: "#f4f4f5", typographyColor: "#18181b", headingColor: "#18181b", fontSans: "TikTok Sans", fontHeading: "Old Standard TT", radius: "1rem", logoUrl: "" }
 
   const updateTheme = (key: string, val: string) => {
     onChange({ ...theme, [key]: val })
@@ -376,6 +376,41 @@ function ThemeBuilder({ value, onChange }: { value: any, onChange: (val: any) =>
               className="font-mono text-sm"
             />
           </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label className="text-xs font-bold uppercase text-muted-foreground">Typography (Text) Color</Label>
+          <div className="flex items-center gap-3">
+            <input 
+              type="color" 
+              value={theme.typographyColor || "#18181b"} 
+              onChange={(e) => updateTheme("typographyColor", e.target.value)}
+              className="h-10 w-20 cursor-pointer border-0 p-1 bg-transparent"
+            />
+            <Input 
+              value={theme.typographyColor || "#18181b"} 
+              onChange={(e) => updateTheme("typographyColor", e.target.value)} 
+              className="font-mono text-sm"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label className="text-xs font-bold uppercase text-muted-foreground">Heading Color</Label>
+          <div className="flex items-center gap-3">
+            <input 
+              type="color" 
+              value={theme.headingColor || "#18181b"} 
+              onChange={(e) => updateTheme("headingColor", e.target.value)}
+              className="h-10 w-20 cursor-pointer border-0 p-1 bg-transparent"
+            />
+            <Input 
+              value={theme.headingColor || "#18181b"} 
+              onChange={(e) => updateTheme("headingColor", e.target.value)} 
+              className="font-mono text-sm"
+            />
+          </div>
+        </div>
         </div>
 
         <div className="space-y-2">

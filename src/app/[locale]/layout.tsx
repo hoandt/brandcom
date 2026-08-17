@@ -55,6 +55,7 @@ export default async function RootLayout({ children, params }: Props) {
   const primaryColor = themeSettings.primaryColor || "#e11d48";
   const secondaryColor = themeSettings.secondaryColor;
   const typographyColor = themeSettings.typographyColor;
+  const headingColor = themeSettings.headingColor;
   const radius = themeSettings.radius || "1rem";
   const fontSans = themeSettings.fontSans && themeSettings.fontSans !== "TikTok Sans" 
     ? `"${themeSettings.fontSans}", sans-serif`
@@ -67,6 +68,7 @@ export default async function RootLayout({ children, params }: Props) {
     "--primary": primaryColor,
     ...(secondaryColor && { "--secondary": secondaryColor }),
     ...(typographyColor && { "--foreground": typographyColor }),
+    ...(headingColor && { "--heading-color": headingColor }),
     "--radius": radius,
     ...(fontSans && { "--font-sans": fontSans }),
     ...(fontHeading && { "--font-heading": fontHeading }),
