@@ -411,24 +411,7 @@ function ThemeBuilder({ value, onChange }: { value: any, onChange: (val: any) =>
             />
           </div>
         </div>
-        </div>
 
-        <div className="space-y-2">
-          <Label className="text-xs font-bold uppercase text-muted-foreground">Typography (Text) Color</Label>
-          <div className="flex items-center gap-3">
-            <input 
-              type="color" 
-              value={theme.typographyColor || "#18181b"} 
-              onChange={(e) => updateTheme("typographyColor", e.target.value)}
-              className="h-10 w-20 cursor-pointer border-0 p-1 bg-transparent"
-            />
-            <Input 
-              value={theme.typographyColor || "#18181b"} 
-              onChange={(e) => updateTheme("typographyColor", e.target.value)} 
-              className="font-mono text-sm"
-            />
-          </div>
-        </div>
 
         <div className="space-y-2">
           <Label className="text-xs font-bold uppercase text-muted-foreground">Logo Image URL</Label>

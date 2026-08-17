@@ -81,7 +81,7 @@ export function DesktopCategoryMenu({ transparent, active, isOpen, onOpenChange 
   const locale = useLocale();
   const t = useTranslations("Navbar");
   const query = useCategoryNavigation();
-  
+
   // Keep internal state for fallback if not controlled
   const [internalOpen, setInternalOpen] = useState(false);
   const open = isOpen !== undefined ? isOpen : internalOpen;
@@ -129,8 +129,8 @@ export function DesktopCategoryMenu({ transparent, active, isOpen, onOpenChange 
   };
 
   return (
-    <div 
-      onMouseEnter={handleMouseEnter} 
+    <div
+      onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       className="flex h-full items-center"
     >
@@ -152,9 +152,9 @@ export function DesktopCategoryMenu({ transparent, active, isOpen, onOpenChange 
           onClick={() => setOpen(false)}
           className="absolute inset-x-0 top-[100%] h-[100vh] z-[100] bg-foreground/20 font-heading text-foreground backdrop-blur-[2px] animate-in fade-in duration-150"
         >
-          <div 
-            onClick={(event) => event.stopPropagation()} 
-            onMouseEnter={handleMouseEnter} 
+          <div
+            onClick={(event) => event.stopPropagation()}
+            onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
             className="flex max-h-[min(72dvh,44rem)] w-full flex-col overflow-hidden border-b bg-background shadow-[0_18px_45px_rgba(39,31,29,0.16)] animate-in slide-in-from-top-2 duration-200"
           >
@@ -167,8 +167,6 @@ export function DesktopCategoryMenu({ transparent, active, isOpen, onOpenChange 
             </header>
             <main className="storefront-container min-h-0 overflow-y-auto py-6">
               <div className="mb-5 flex items-end justify-between border-b pb-3">
-                <div><p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">{t("shopByCategory")}</p><p className="mt-1 text-xs text-muted-foreground">{t("browseCategoryHint")}</p></div>
-                <div className="flex gap-5 text-[10px] font-bold uppercase tracking-wider"><Link href={`/${locale}/collections/new`} onClick={() => setOpen(false)} className="hover:text-primary">{t("newArrivals")}</Link><Link href={`/${locale}/collections/all`} onClick={() => setOpen(false)} className="hover:text-primary">{t("allProducts")}</Link></div>
               </div>
               {query.isLoading ? <CategoryLoadingGrid /> : query.isError ? <p className="border border-destructive/30 bg-destructive/5 p-5 text-sm text-destructive">{t("categoryLoadError")}</p> : items.length ? <div className="grid grid-cols-3 gap-x-4 gap-y-6 lg:grid-cols-5 xl:grid-cols-6">{items.map((item) => <CategoryCard key={item.id} item={item} imageUrl={images.get(item.id) ?? null} locale={locale} onNavigate={() => setOpen(false)} />)}</div> : <p className="py-16 text-center text-sm text-muted-foreground">{t("noCategories")}</p>}
             </main>
