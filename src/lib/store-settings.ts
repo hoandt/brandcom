@@ -34,15 +34,19 @@ export const DEFAULT_STORE_SETTINGS = {
     : process.env.SMTP_USER ? [process.env.SMTP_USER] : [],
 };
 
-let cachedSettings: { data: any; expiresAt: number } | null = null;
+const globalForStoreSettings = globalThis as unknown as {
+  __storeSettingsCache?: { data: any; expiresAt: number } | null;
+};
+
 const CACHE_TTL_MS = 5 * 60_000; // 5 minutes in-memory cache
 
 export function invalidateStoreSettingsCache() {
-  cachedSettings = null;
+  globalForStoreSettings.__storeSettingsCache = null;
 }
 
 export async function getStoreSettings(tenantId = DEFAULT_TENANT_ID) {
   const now = Date.now();
+  const cachedSettings = globalForStoreSettings.__storeSettingsCache;
   if (cachedSettings && cachedSettings.expiresAt > now && cachedSettings.data.tenantId === tenantId) {
     return cachedSettings.data;
   }
@@ -59,7 +63,7 @@ export async function getStoreSettings(tenantId = DEFAULT_TENANT_ID) {
     });
   }
 
-  cachedSettings = { data: settings, expiresAt: now + CACHE_TTL_MS };
+  globalForStoreSettings.__storeSettingsCache = { data: settings, expiresAt: now + CACHE_TTL_MS };
   return settings;
 }
 

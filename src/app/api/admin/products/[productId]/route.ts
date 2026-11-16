@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { uploadFileToR2 } from "@/lib/r2";
 import { slugify } from "@/lib/slugify";
-import { revalidateTag } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { invalidateProductsListCache } from "../route";
 import { invalidateStorefrontCache } from "@/lib/storefront-cache";
 
@@ -414,6 +414,7 @@ export async function PUT(
     invalidateAdminProductCache(productId);
     invalidateProductsListCache();
     invalidateStorefrontCache();
+    revalidatePath("/", "layout");
     if (process.env.NODE_ENV === "production") {
       revalidateTag("products");
     }

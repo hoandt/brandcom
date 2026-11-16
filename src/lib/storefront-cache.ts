@@ -1,6 +1,12 @@
 type CacheEntry<T> = { value: T; expiresAt: number };
 
-const entries = new Map<string, CacheEntry<unknown>>();
+const globalForStorefrontCache = globalThis as unknown as {
+  __storefrontCacheEntries?: Map<string, CacheEntry<unknown>>;
+};
+
+const entries =
+  globalForStorefrontCache.__storefrontCacheEntries ??
+  (globalForStorefrontCache.__storefrontCacheEntries = new Map<string, CacheEntry<unknown>>());
 
 export async function storefrontCache<T>(key: string, ttlSeconds: number, load: () => Promise<T>): Promise<T> {
   if (ttlSeconds <= 0) return load();
@@ -26,7 +32,7 @@ export function invalidateStorefrontCache(prefix?: string) {
 
 export function publicCacheHeaders(ttlSeconds: number) {
   if (ttlSeconds <= 0) return { "Cache-Control": "no-store" };
-  return { "Cache-Control": `public, s-maxage=${ttlSeconds}, stale-while-revalidate=${Math.max(ttlSeconds * 3, 60)}` };
+  return { "Cache-Control": `public, max-age=0, s-maxage=${ttlSeconds}, must-revalidate` };
 }
 
 export const noStoreHeaders = { "Cache-Control": "private, no-store, max-age=0" };

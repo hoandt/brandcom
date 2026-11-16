@@ -484,7 +484,10 @@ export default function EditProductForm({ initialData }: EditProductFormProps) {
 
       if (res.ok) {
         queryClient.removeQueries({ queryKey: ["admin-product", initialData.id] })
-        await queryClient.invalidateQueries({ queryKey: ["admin-products"] })
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["admin-products"] }),
+          queryClient.invalidateQueries({ queryKey: ["collection"] }),
+        ])
         router.push(`/${locale}/admin/products`)
         router.refresh()
       } else {

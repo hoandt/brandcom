@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Banknote, BellRing, Building2, ChevronRight, Globe2, Loader2, PackageCheck, Plus, Save, Store, Trash2, Truck } from "lucide-react";
+import { Banknote, BellRing, Building2, ChevronRight, Globe2, Loader2, PackageCheck, Plus, RotateCcw, Save, Store, Trash2, Truck } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -107,6 +107,22 @@ export default function AdminSettingsPage() {
     },
   });
 
+  const clearCache = useMutation({
+    mutationFn: async () => {
+      const response = await fetch("/api/admin/cache/clear", { method: "POST" });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Failed to clear cache");
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      toast.success("Storefront cache cleared");
+    },
+    onError: (mutationError: Error) => {
+      toast.error(mutationError.message);
+    },
+  });
+
   if (query.isLoading) return <SettingsSkeleton />;
   if (query.isError) return <div className="border border-destructive bg-destructive/5 p-4 text-sm text-destructive">{query.error.message}</div>;
 
@@ -140,6 +156,12 @@ export default function AdminSettingsPage() {
         <Field label="Collections"><Input type="number" min="0" max="86400" value={form.collectionCacheSeconds} onChange={(event) => setForm({ ...form, collectionCacheSeconds: Number(event.target.value) })} /><span className="text-[10px] font-normal text-muted-foreground">Recommended: 300 seconds</span></Field>
         <Field label="Categories"><Input type="number" min="0" max="86400" value={form.categoryCacheSeconds} onChange={(event) => setForm({ ...form, categoryCacheSeconds: Number(event.target.value) })} /><span className="text-[10px] font-normal text-muted-foreground">Recommended: 300 seconds</span></Field>
         <Field label="Store settings"><Input type="number" min="0" max="86400" value={form.storeSettingsCacheSeconds} onChange={(event) => setForm({ ...form, storeSettingsCacheSeconds: Number(event.target.value) })} /><span className="text-[10px] font-normal text-muted-foreground">Recommended: 300 seconds</span></Field>
+        <div className="md:col-span-2 flex items-center justify-between border-t pt-3">
+          <span className="text-xs text-muted-foreground">Need changes to appear immediately across all storefront pages?</span>
+          <Button type="button" variant="outline" disabled={clearCache.isPending} onClick={() => clearCache.mutate()} className="h-9 rounded-none px-4 text-xs uppercase tracking-wider">
+            {clearCache.isPending ? <><Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> Clearing...</> : <><RotateCcw className="mr-2 h-3.5 w-3.5" /> Clear cache now</>}
+          </Button>
+        </div>
       </SettingsSection>
 
       <SettingsSection id="regional" icon={Globe2} title="Regional settings" description="Formatting defaults for this tenant.">

@@ -10,19 +10,28 @@ export type FeaturedProductsComponent = {
   order?: number;
 };
 
-let cachedComponents: Record<string, { data: any; expiresAt: number }> = {};
+const globalForDynamicComponents = globalThis as unknown as {
+  __dynamicComponentsCache?: Record<string, { data: any; expiresAt: number }>;
+};
+
+const getCachedComponents = () =>
+  globalForDynamicComponents.__dynamicComponentsCache ??
+  (globalForDynamicComponents.__dynamicComponentsCache = {});
+
 const CACHE_TTL_MS = process.env.NODE_ENV === "development" ? 0 : 5 * 60_000; // 5 minutes in-memory cache in production
 
 export function invalidateDynamicComponentCache(code?: string) {
+  const cache = getCachedComponents();
   if (code) {
-    delete cachedComponents[code];
+    delete cache[code];
   } else {
-    cachedComponents = {};
+    globalForDynamicComponents.__dynamicComponentsCache = {};
   }
 }
 
 export async function getDynamicComponent<T = any>(code: string): Promise<T | null> {
   const now = Date.now();
+  const cachedComponents = getCachedComponents();
   const cached = cachedComponents[code];
 
   if (cached && cached.expiresAt > now) {
