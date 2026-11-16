@@ -335,5 +335,22 @@
     "signIn": "Đăng nhập",
     "previous": "Trước",
     "next": "Tiếp"
+  },
+  "Footer": {
+    "shop": "Mua sắm",
+    "newArrivals": "Hàng mới về",
+    "allProducts": "Tất cả sản phẩm",
+    "company": "Công ty",
+    "about": "Về chúng tôi",
+    "contact": "Liên hệ",
+    "legal": "Pháp lý",
+    "terms": "Điều khoản dịch vụ",
+    "privacy": "Chính sách bảo mật",
+    "companyName": "CÔNG TY TNHH THƯƠNG MẠI SPH",
+    "taxCodeLabel": "Tax Code (Mã số thuế)",
+    "taxCode": "0319427212",
+    "addressLabel": "Address",
+    "address": "Lầu 2, 137 Nguyễn Thị Nhung, Phường Hiệp Bình, Thành phố Hồ Chí Minh, Việt Nam",
+    "allRightsReserved": "Bảo lưu mọi quyền."
   }
 }

@@ -295,5 +295,22 @@
   },
   "Reviews": {
     "eyebrow": "ความคิดเห็นจากลูกค้า", "title": "รีวิวจากลูกค้า", "writeReview": "เขียนรีวิว", "cancel": "ยกเลิก", "rate": "ให้คะแนน {productName}", "headlinePlaceholder": "เพิ่มหัวข้อ", "bodyPlaceholder": "คุณชอบหรือไม่ชอบอะไร? ขนาดและคุณภาพเป็นอย่างไร?", "submit": "ส่งรีวิว", "submitting": "กำลังส่ง…", "submitError": "ไม่สามารถส่งรีวิวได้", "moderationNote": "รีวิวจะได้รับการตรวจสอบก่อนเผยแพร่", "loadError": "ไม่สามารถโหลดรีวิวได้", "globalRatings": "{count} คะแนน", "mostHelpful": "มีประโยชน์ที่สุด", "mostRecent": "ล่าสุด", "empty": "ยังไม่มีรีวิว เป็นคนแรกที่แบ่งปันประสบการณ์ของคุณ", "verifiedPurchase": "ยืนยันการซื้อแล้ว", "helpful": "มีประโยชน์", "signInToVote": "เข้าสู่ระบบเพื่อลงคะแนน", "signIn": "เข้าสู่ระบบ", "previous": "ก่อนหน้า", "next": "ถัดไป"
+  },
+  "Footer": {
+    "shop": "ช้อปปิ้ง",
+    "newArrivals": "สินค้ามาใหม่",
+    "allProducts": "สินค้าทั้งหมด",
+    "company": "บริษัท",
+    "about": "เกี่ยวกับเรา",
+    "contact": "ติดต่อเรา",
+    "legal": "กฎหมาย",
+    "terms": "ข้อกำหนดการให้บริการ",
+    "privacy": "นโยบายความเป็นส่วนตัว",
+    "companyName": "CÔNG TY TNHH THƯƠNG MẠI SPH",
+    "taxCodeLabel": "Tax Code (Mã số thuế)",
+    "taxCode": "0319427212",
+    "addressLabel": "Address",
+    "address": "Lầu 2, 137 Nguyễn Thị Nhung, Phường Hiệp Bình, Thành phố Hồ Chí Minh, Việt Nam",
+    "allRightsReserved": "สงวนลิขสิทธิ์"
   }
 }

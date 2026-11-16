@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import Image from "next/image";
@@ -8,6 +9,53 @@ import { getTranslations } from "next-intl/server";
 import { ProductCard } from "@/components/storefront/product-card";
 import { getStoreSettings } from "@/lib/store-settings";
 import { storefrontCache } from "@/lib/storefront-cache";
+import { brandConfig } from "@/lib/brand-config";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string; slug: string }>;
+}): Promise<Metadata> {
+  const { locale, slug } = await params;
+  const settings = await getStoreSettings();
+  const category = await storefrontCache(`category:${slug}`, settings.categoryCacheSeconds, () =>
+    prisma.category.findUnique({
+      where: { slug },
+      select: { name: true, description: true, heroImageUrl: true, isActive: true },
+    })
+  );
+
+  if (!category || !category.isActive) {
+    return {
+      title: "Category Not Found",
+      robots: { index: false, follow: false },
+    };
+  }
+
+  const siteUrl = brandConfig.siteUrl.replace(/\/$/, "");
+  const canonicalUrl = `${siteUrl}/${locale}/categories/${slug}`;
+
+  return {
+    title: category.name,
+    description: category.description || category.name,
+    alternates: {
+      canonical: canonicalUrl,
+      languages: {
+        vi: `${siteUrl}/vi/categories/${slug}`,
+        en: `${siteUrl}/en/categories/${slug}`,
+        th: `${siteUrl}/th/categories/${slug}`,
+        "x-default": `${siteUrl}/vi/categories/${slug}`,
+      },
+    },
+    openGraph: {
+      title: category.name,
+      description: category.description || category.name,
+      url: canonicalUrl,
+      type: "website",
+      ...(category.heroImageUrl ? { images: [{ url: category.heroImageUrl, alt: category.name }] } : {}),
+    },
+  };
+}
 
 export default async function CategoryPage({
   params,

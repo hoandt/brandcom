@@ -7,7 +7,10 @@ interface TopbarProps {
 export function Topbar({ data }: TopbarProps) {
   if (!data || !data.text) return null
 
-  const backgroundColor = data.backgroundColor || "#18181b"
+  const backgroundColor =
+    !data.backgroundColor || data.backgroundColor.toLowerCase() === "#e11d48"
+      ? "var(--primary)"
+      : data.backgroundColor
   const textColor = data.textColor || "#ffffff"
   const speed = data.speed || 20
   

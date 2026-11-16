@@ -314,5 +314,22 @@
   },
   "Reviews": {
     "eyebrow": "Customer feedback", "title": "Customer reviews", "writeReview": "Write a review", "cancel": "Cancel", "rate": "Rate {productName}", "headlinePlaceholder": "Add a headline", "bodyPlaceholder": "What did you like or dislike? How was the fit and quality?", "submit": "Submit review", "submitting": "Submitting…", "submitError": "Could not submit review", "moderationNote": "Reviews are checked before publishing.", "loadError": "Reviews could not be loaded.", "globalRatings": "{count} ratings", "mostHelpful": "Most helpful", "mostRecent": "Most recent", "empty": "No customer reviews yet. Be the first to share your experience.", "verifiedPurchase": "Verified purchase", "helpful": "Helpful", "signInToVote": "Sign in to vote", "signIn": "Sign in", "previous": "Previous", "next": "Next"
+  },
+  "Footer": {
+    "shop": "Shop",
+    "newArrivals": "New Arrivals",
+    "allProducts": "All Products",
+    "company": "Company",
+    "about": "About",
+    "contact": "Contact",
+    "legal": "Legal",
+    "terms": "Terms of Service",
+    "privacy": "Privacy Policy",
+    "companyName": "CÔNG TY TNHH THƯƠNG MẠI SPH",
+    "taxCodeLabel": "Tax Code (Mã số thuế)",
+    "taxCode": "0319427212",
+    "addressLabel": "Address",
+    "address": "Lầu 2, 137 Nguyễn Thị Nhung, Phường Hiệp Bình, Thành phố Hồ Chí Minh, Việt Nam",
+    "allRightsReserved": "All rights reserved."
   }
 }

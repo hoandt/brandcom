@@ -323,7 +323,7 @@ function TopbarBuilder({ value, onChange }: { value: any, onChange: (val: any) =
 // THEME BUILDER
 // ----------------------------------------------------
 function ThemeBuilder({ value, onChange }: { value: any, onChange: (val: any) => void }) {
-  const theme = value || { primaryColor: "#e11d48", secondaryColor: "#f4f4f5", typographyColor: "#18181b", headingColor: "#18181b", fontSans: "TikTok Sans", fontHeading: "Old Standard TT", radius: "1rem", logoUrl: "" }
+  const theme = value || { primaryColor: "#881337", secondaryColor: "#f4f4f5", typographyColor: "#18181b", headingColor: "#18181b", fontSans: "TikTok Sans", fontHeading: "Old Standard TT", radius: "1rem", logoUrl: "" }
 
   const updateTheme = (key: string, val: string) => {
     onChange({ ...theme, [key]: val })
@@ -349,12 +349,12 @@ function ThemeBuilder({ value, onChange }: { value: any, onChange: (val: any) =>
           <div className="flex items-center gap-3">
             <input 
               type="color" 
-              value={theme.primaryColor || "#e11d48"} 
+              value={theme.primaryColor || "#881337"} 
               onChange={(e) => updateTheme("primaryColor", e.target.value)}
               className="h-10 w-20 cursor-pointer border-0 p-1 bg-transparent"
             />
             <Input 
-              value={theme.primaryColor || "#e11d48"} 
+              value={theme.primaryColor || "#881337"} 
               onChange={(e) => updateTheme("primaryColor", e.target.value)} 
               className="font-mono text-sm"
             />

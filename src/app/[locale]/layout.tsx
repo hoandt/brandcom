@@ -24,19 +24,37 @@ import { getStoreSettings } from "@/lib/store-settings";
 
 export const dynamic = 'force-dynamic';
 
-export async function generateMetadata(): Promise<Metadata> {
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { locale } = await params;
   const settings = await getStoreSettings();
   const title = settings.seoTitle || settings.storeName || brandConfig.name;
   const description = settings.seoDescription || settings.tagline || brandConfig.tagline;
+  const siteUrl = brandConfig.siteUrl.replace(/\/$/, "");
 
   return {
-    metadataBase: new URL(brandConfig.siteUrl),
+    metadataBase: new URL(siteUrl),
     title: {
       default: title,
       template: `%s | ${title}`,
     },
-    description: description,
+    description,
     applicationName: title,
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: {
+        index: true,
+        follow: true,
+        "max-image-preview": "large",
+        "max-snippet": -1,
+        "max-video-preview": -1,
+      },
+    },
+    openGraph: {
+      siteName: settings.storeName || brandConfig.name,
+      locale: locale === "vi" ? "vi_VN" : locale === "th" ? "th_TH" : "en_US",
+      type: "website",
+    },
   };
 }
 
@@ -52,7 +70,7 @@ export default async function RootLayout({ children, params }: Props) {
   const theme = await getDynamicComponent("theme-settings");
   const themeSettings = (theme as any) || {};
   
-  const primaryColor = themeSettings.primaryColor || "#e11d48";
+  const primaryColor = "#881337";
   const secondaryColor = themeSettings.secondaryColor;
   const typographyColor = themeSettings.typographyColor;
   const headingColor = themeSettings.headingColor;

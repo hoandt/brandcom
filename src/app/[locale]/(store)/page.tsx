@@ -1,9 +1,32 @@
+import type { Metadata } from "next"
 import { getLocale } from "next-intl/server"
 import { VideoHero } from "@/components/storefront/video-hero"
 import { Suspense } from "react"
 import { FeaturedProducts, FeaturedProductsSkeleton } from "@/components/storefront/featured-products"
 import { FeaturedCategories, FeaturedCategoriesSkeleton } from "@/components/storefront/featured-categories"
 import { getDynamicComponentsByType, type FeaturedProductsComponent } from "@/lib/dynamic-components"
+import { brandConfig } from "@/lib/brand-config"
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>
+}): Promise<Metadata> {
+  const { locale } = await params
+  const siteUrl = brandConfig.siteUrl.replace(/\/$/, "")
+
+  return {
+    alternates: {
+      canonical: `${siteUrl}/${locale}`,
+      languages: {
+        vi: `${siteUrl}/vi`,
+        en: `${siteUrl}/en`,
+        th: `${siteUrl}/th`,
+        "x-default": `${siteUrl}/vi`,
+      },
+    },
+  }
+}
 
 export default async function StorefrontPage() {
   const locale = await getLocale()
