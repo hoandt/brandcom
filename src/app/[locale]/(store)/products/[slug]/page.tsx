@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { ProductClient } from "./product-client";
 import type { Metadata } from "next";
@@ -240,35 +239,6 @@ export default async function ProductPage({ params }: Props) {
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify([jsonLd, breadcrumbJsonLd]) }}
         />
-
-        {/* Visible SEO Breadcrumbs */}
-        <nav
-          aria-label={tProduct("breadcrumbLabel")}
-          className="px-4 py-2.5 lg:px-0 lg:pt-0 lg:pb-3 text-xs text-muted-foreground"
-        >
-          <ol className="flex flex-wrap items-center gap-1.5">
-            {breadcrumbs.map((crumb, idx) => {
-              const isLast = idx === breadcrumbs.length - 1;
-              return (
-                <li key={idx} className="flex items-center gap-1.5">
-                  {idx > 0 && <span aria-hidden="true" className="text-border">/</span>}
-                  {crumb.href && !isLast ? (
-                    <Link
-                      href={crumb.href}
-                      className="hover:text-foreground transition-colors"
-                    >
-                      {crumb.label}
-                    </Link>
-                  ) : (
-                    <span className="text-foreground/80 font-medium line-clamp-1" aria-current="page">
-                      {crumb.label}
-                    </span>
-                  )}
-                </li>
-              );
-            })}
-          </ol>
-        </nav>
 
         <ProductClient
           product={{

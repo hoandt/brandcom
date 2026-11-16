@@ -61,7 +61,9 @@ export function ProductClient({ product, details }: ProductClientProps) {
     return available ? available.id : (product.variants[0]?.id || "");
   });
   const [activeImageIdx, setActiveImageIdx] = useState(0);
-  const swipeStartRef = useRef<{ x: number; y: number } | null>(null);
+  const [touchDragX, setTouchDragX] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const swipeStartRef = useRef<{ x: number; y: number; lockedAxis?: "x" | "y" } | null>(null);
 
   // Fullscreen Lightbox State
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -149,28 +151,54 @@ export function ProductClient({ product, details }: ProductClientProps) {
     });
   };
 
+  const galleryImages = allImages.slice(0, 8);
+
   const handlePrevImage = () => {
-    setActiveImageIdx((prev) => (prev === 0 ? Math.min(allImages.length, 6) - 1 : prev - 1));
+    if (galleryImages.length < 2) return;
+    setActiveImageIdx((prev) => (prev === 0 ? galleryImages.length - 1 : prev - 1));
   };
 
   const handleNextImage = () => {
-    setActiveImageIdx((prev) => (prev === Math.min(allImages.length, 6) - 1 ? 0 : prev + 1));
+    if (galleryImages.length < 2) return;
+    setActiveImageIdx((prev) => (prev === galleryImages.length - 1 ? 0 : prev + 1));
   };
 
   const handleSwipeStart = (event: React.TouchEvent<HTMLDivElement>) => {
+    if (galleryImages.length < 2) return;
     const touch = event.touches[0];
     swipeStartRef.current = { x: touch.clientX, y: touch.clientY };
+    setIsDragging(true);
+    setTouchDragX(0);
+  };
+
+  const handleSwipeMove = (event: React.TouchEvent<HTMLDivElement>) => {
+    const start = swipeStartRef.current;
+    if (!start || galleryImages.length < 2) return;
+    const touch = event.touches[0];
+    const deltaX = touch.clientX - start.x;
+    const deltaY = touch.clientY - start.y;
+
+    if (!start.lockedAxis) {
+      if (Math.abs(deltaX) < 6 && Math.abs(deltaY) < 6) return;
+      start.lockedAxis = Math.abs(deltaX) > Math.abs(deltaY) ? "x" : "y";
+    }
+
+    if (start.lockedAxis === "x") {
+      setTouchDragX(deltaX);
+    }
   };
 
   const handleSwipeEnd = (event: React.TouchEvent<HTMLDivElement>) => {
     const start = swipeStartRef.current;
     const touch = event.changedTouches[0];
     swipeStartRef.current = null;
-    if (!start || allImages.length < 2) return;
+    setIsDragging(false);
+    setTouchDragX(0);
+    if (!start || galleryImages.length < 2) return;
 
     const deltaX = touch.clientX - start.x;
     const deltaY = touch.clientY - start.y;
-    if (Math.abs(deltaX) < 40 || Math.abs(deltaX) <= Math.abs(deltaY)) return;
+    if (start.lockedAxis === "y" || Math.abs(deltaX) < 35 || Math.abs(deltaX) <= Math.abs(deltaY)) return;
 
     if (deltaX < 0) handleNextImage();
     else handlePrevImage();
@@ -199,17 +227,37 @@ export function ProductClient({ product, details }: ProductClientProps) {
             <div
               className="group relative aspect-[4/5] w-full touch-pan-y select-none overflow-hidden bg-muted/40"
               onTouchStart={handleSwipeStart}
+              onTouchMove={handleSwipeMove}
               onTouchEnd={handleSwipeEnd}
+              onTouchCancel={() => {
+                swipeStartRef.current = null;
+                setIsDragging(false);
+                setTouchDragX(0);
+              }}
             >
-              {allImages[activeImageIdx] ? (
-                <Image
-                  src={allImages[activeImageIdx].url}
-                  alt={`${product.name} - Image ${activeImageIdx + 1}`}
-                  fill
-                  className="object-cover transition-all duration-300"
-                  sizes="(max-width: 1024px) 100vw, 60vw"
-                  priority
-                />
+              {galleryImages.length > 0 ? (
+                <div
+                  className={`flex h-full w-full will-change-transform ${
+                    isDragging ? "" : "transition-transform duration-200 ease-out"
+                  }`}
+                  style={{
+                    transform: `translate3d(calc(-${activeImageIdx * 100}% + ${touchDragX}px), 0, 0)`,
+                  }}
+                >
+                  {galleryImages.map((img, idx) => (
+                    <div key={idx} className="relative h-full w-full shrink-0">
+                      <Image
+                        src={img.url}
+                        alt={`${product.name} - Image ${idx + 1}`}
+                        fill
+                        className="object-cover pointer-events-none"
+                        sizes="100vw"
+                        priority={idx <= 1}
+                        loading="eager"
+                      />
+                    </div>
+                  ))}
+                </div>
               ) : (
                 <div className="flex h-full items-center justify-center">
                   <span className="text-xs uppercase tracking-widest text-muted-foreground">No Image Available</span>
@@ -217,18 +265,20 @@ export function ProductClient({ product, details }: ProductClientProps) {
               )}
 
               {/* Left/Right Navigation Arrows */}
-              {allImages.length > 1 && (
+              {galleryImages.length > 1 && (
                 <>
                   <button
+                    type="button"
                     onClick={handlePrevImage}
-                    className="absolute left-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center border border-foreground/15 bg-background/90 text-foreground opacity-90 transition-all hover:border-foreground/50 active:scale-95"
+                    className="absolute left-3 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center border border-foreground/15 bg-background/90 text-foreground opacity-90 transition-all hover:border-foreground/50 active:scale-95"
                     aria-label="Previous image"
                   >
                     <ChevronLeft className="h-5 w-5" />
                   </button>
                   <button
+                    type="button"
                     onClick={handleNextImage}
-                    className="absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center border border-foreground/15 bg-background/90 text-foreground opacity-90 transition-all hover:border-foreground/50 active:scale-95"
+                    className="absolute right-3 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center border border-foreground/15 bg-background/90 text-foreground opacity-90 transition-all hover:border-foreground/50 active:scale-95"
                     aria-label="Next image"
                   >
                     <ChevronRight className="h-5 w-5" />
@@ -238,23 +288,40 @@ export function ProductClient({ product, details }: ProductClientProps) {
 
               {/* Badge */}
               {isSelectedVariantOnSale && (
-                <div className="absolute left-3 top-3 bg-foreground px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-background">
+                <div className="absolute left-3 top-3 z-10 bg-foreground px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-background">
                   Sale
                 </div>
               )}
             </div>
 
-            {/* Bullet Navigation */}
-            {allImages.length > 1 && (
-              <div className="flex justify-center gap-2 pb-4 pt-3">
-                {allImages.slice(0, 6).map((_, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setActiveImageIdx(idx)}
-                    className={`h-1.5 rounded-full transition-all duration-300 ${activeImageIdx === idx ? "w-6 bg-foreground" : "w-1.5 bg-border hover:bg-foreground/40"}`}
-                    aria-label={`Go to slide ${idx + 1}`}
-                  />
-                ))}
+            {/* Thumbnail Strip Below Hero Image */}
+            {galleryImages.length > 1 && (
+              <div className="flex items-center gap-2 overflow-x-auto px-3 pb-3 pt-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {galleryImages.map((img, idx) => {
+                  const isActive = activeImageIdx === idx;
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setActiveImageIdx(idx)}
+                      className={`relative h-14 w-14 shrink-0 overflow-hidden rounded-none border transition-all ${
+                        isActive
+                          ? "border-primary ring-1 ring-primary opacity-100"
+                          : "border-border/60 opacity-60 hover:opacity-100"
+                      }`}
+                      aria-label={`Go to image ${idx + 1}`}
+                    >
+                      <Image
+                        src={img.url}
+                        alt={`${product.name} - Thumbnail ${idx + 1}`}
+                        fill
+                        className="object-cover"
+                        sizes="56px"
+                        loading="eager"
+                      />
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
