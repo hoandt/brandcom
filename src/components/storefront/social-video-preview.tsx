@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { useTranslations } from "next-intl"
-import { ArrowRight, ArrowUpRight, ChevronLeft, ChevronRight, Pause, Play, ShoppingBag, X } from "lucide-react"
+import { ArrowRight, ArrowUpRight, ChevronLeft, ChevronRight, Pause, Play, ShoppingBag, Volume2, VolumeX, X } from "lucide-react"
 import type { SocialVideoFeedItem } from "@/lib/homepage-media"
 import styles from "./social-video-preview.module.css"
 import { useLoopingVideoCarousel, wrapVideoIndex } from "./use-looping-video-carousel"
@@ -29,6 +29,7 @@ export function SocialVideoPreview({ items, heading }: {
   const players = useRef<(HTMLVideoElement | null)[]>([])
   const centerControl = useRef<HTMLButtonElement>(null)
   const [playbackOverride, setPlaybackOverride] = useState<PlaybackOverride | null>(null)
+  const [unmutedIndex, setUnmutedIndex] = useState<number | null>(null)
   const [failedClip, setFailedClip] = useState<number | null>(null)
   const [hoveredSlot, setHoveredSlot] = useState<number | null>(null)
   const [visibleRatio, setVisibleRatio] = useState(0)
@@ -72,6 +73,7 @@ export function SocialVideoPreview({ items, heading }: {
   }, [track])
 
   useEffect(() => {
+    setUnmutedIndex((current) => current === activeIndex ? current : null)
     if (activeIndex === undefined) return
     const video = players.current[activeIndex]
     if (!video) return
@@ -79,6 +81,7 @@ export function SocialVideoPreview({ items, heading }: {
     return () => {
       if (document.activeElement === video) video.blur()
       video.pause()
+      video.muted = true
       video.load()
     }
   }, [activeIndex])
@@ -124,6 +127,18 @@ export function SocialVideoPreview({ items, heading }: {
     setPlaybackOverride({ index, mode: "manual" })
   }
 
+  function toggleSound(index: number) {
+    const video = players.current[index]
+    if (!video) return
+
+    const enableSound = video.muted || video.volume === 0
+    if (enableSound && video.volume === 0) video.volume = 1
+    video.muted = !enableSound
+    if (enableSound && previewIndex === index && video.paused) {
+      void video.play().catch(() => undefined)
+    }
+  }
+
   function handleArrowKey(event: KeyboardEvent<HTMLUListElement>) {
     if (event.target !== event.currentTarget || event.altKey || event.ctrlKey || event.metaKey) return
     if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return
@@ -155,6 +170,7 @@ export function SocialVideoPreview({ items, heading }: {
             const isActive = !isPreviewCopy && activeIndex === index
             const isManual = !isPreviewCopy && manualIndex === index
             const isPreview = !isPreviewCopy && previewIndex === index
+            const hasSound = unmutedIndex === index
             const offset = slot - centered
             const needsCentering = offset !== 0
             return (
@@ -186,6 +202,13 @@ export function SocialVideoPreview({ items, heading }: {
                       loop={isPreview}
                       muted
                       playsInline
+                      onVolumeChange={(event) => {
+                        const { muted, volume } = event.currentTarget
+                        setUnmutedIndex((current) => {
+                          if (isActive && !muted && volume > 0) return index
+                          return current === index ? null : current
+                        })
+                      }}
                       onError={() => {
                         if (!isActive) return
                         setFailedClip(index)
@@ -232,6 +255,19 @@ export function SocialVideoPreview({ items, heading }: {
                         <ArrowUpRight className="size-3.5" strokeWidth={1.35} aria-hidden />
                       </span>
                     </a>
+                  )}
+                  {isActive && (
+                    <button
+                      type="button"
+                      aria-label={t(hasSound ? "muteVideo" : "unmuteVideo", { title: clip.title })}
+                      className={`absolute top-0 right-11 grid size-11 place-items-center ${mediaFocus}`}
+                      onClick={() => toggleSound(index)}
+                    >
+                      <span className={cornerIcon}>
+                        {hasSound ? <Volume2 className="size-3.5" strokeWidth={1.5} aria-hidden />
+                          : <VolumeX className="size-3.5" strokeWidth={1.5} aria-hidden />}
+                      </span>
+                    </button>
                   )}
                   {isPreview && (
                     <button

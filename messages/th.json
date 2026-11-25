@@ -172,6 +172,8 @@
       "nextVideos": "วิดีโอถัดไป",
       "playVideo": "เล่นวิดีโอ {title}",
       "pauseVideo": "หยุดวิดีโอ {title} ชั่วคราว",
+      "unmuteVideo": "เปิดเสียงวิดีโอ {title}",
+      "muteVideo": "ปิดเสียงวิดีโอ {title}",
       "selectVideo": "ไปที่วิดีโอ {title}",
       "closeVideo": "ปิดวิดีโอ {title}",
       "openVideo": "เปิดโพสต์ {title}",
