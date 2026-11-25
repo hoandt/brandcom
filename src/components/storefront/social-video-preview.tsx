@@ -28,6 +28,7 @@ export function SocialVideoPreview({ items, heading }: {
   const { track, centered, settledCenter, padding, move, centerIfNeeded, resetScrollTarget } = useLoopingVideoCarousel(items.length)
   const players = useRef<(HTMLVideoElement | null)[]>([])
   const centerControl = useRef<HTMLButtonElement>(null)
+  const prefersSound = useRef(true)
   const [playbackOverride, setPlaybackOverride] = useState<PlaybackOverride | null>(null)
   const [unmutedIndex, setUnmutedIndex] = useState<number | null>(null)
   const [failedClip, setFailedClip] = useState<number | null>(null)
@@ -38,10 +39,11 @@ export function SocialVideoPreview({ items, heading }: {
   const selectedClip = wrapVideoIndex(centered - padding, items.length)
   const centeredOnVideo = centered >= padding && centered < padding + items.length && Boolean(items[selectedClip]?.videoUrl)
   const override = playbackOverride?.index === selectedClip ? playbackOverride.mode : undefined
+  const autoplayInView = visibleRatio >= autoplayVisibility
   const hoverPreview = hoveredSlot === centered && visibleRatio >= hoverVisibility
   const manualIndex = centeredOnVideo && override === "manual" ? selectedClip : undefined
   const previewIndex = centeredOnVideo && centered === settledCenter && !override && failedClip !== selectedClip &&
-    pageVisible && !reducedMotion && (visibleRatio >= autoplayVisibility || hoverPreview) ? selectedClip : undefined
+    pageVisible && !reducedMotion && (autoplayInView || hoverPreview) ? selectedClip : undefined
   const activeIndex = manualIndex ?? previewIndex
 
   useEffect(() => {
@@ -93,13 +95,26 @@ export function SocialVideoPreview({ items, heading }: {
     if (!video) return
 
     let requested = true
-    video.muted = true
-    void video.play().catch(() => {
+    const withSound = autoplayInView && prefersSound.current
+    video.muted = !withSound
+
+    const playPreview = async () => {
+      try {
+        await video.play()
+      } catch (error) {
+        if (!requested) return
+        if (!withSound || !(error instanceof DOMException) || error.name !== "NotAllowedError") throw error
+        video.muted = true
+        await video.play()
+      }
+    }
+
+    void playPreview().catch(() => {
       if (!requested) return
       setPlaybackOverride((current) => current ?? { index: previewIndex, mode: "paused" })
     })
     return () => { requested = false }
-  }, [previewIndex])
+  }, [previewIndex, autoplayInView])
 
   useEffect(() => {
     if (manualIndex !== undefined) players.current[manualIndex]?.focus({ preventScroll: true })
@@ -123,7 +138,11 @@ export function SocialVideoPreview({ items, heading }: {
       setPlaybackOverride({ index, mode: "paused" })
       return
     }
-    void players.current[index]?.play().catch(() => undefined)
+    const video = players.current[index]
+    if (video) {
+      video.muted = !prefersSound.current
+      void video.play().catch(() => undefined)
+    }
     setFailedClip(null)
     setPlaybackOverride({ index, mode: "manual" })
   }
@@ -134,6 +153,7 @@ export function SocialVideoPreview({ items, heading }: {
 
     const enableSound = video.muted || video.volume === 0
     if (enableSound && video.volume === 0) video.volume = 1
+    prefersSound.current = enableSound
     video.muted = !enableSound
     if (enableSound && previewIndex === index && video.paused) {
       void video.play().catch(() => undefined)
@@ -205,8 +225,10 @@ export function SocialVideoPreview({ items, heading }: {
                       playsInline
                       onVolumeChange={(event) => {
                         const { muted, volume } = event.currentTarget
+                        const audible = !muted && volume > 0
+                        if (isManual) prefersSound.current = audible
                         setUnmutedIndex((current) => {
-                          if (isActive && !muted && volume > 0) return index
+                          if (isActive && audible) return index
                           return current === index ? null : current
                         })
                       }}
