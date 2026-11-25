@@ -1,11 +1,27 @@
+"use client"
+
 import Link from "next/link"
+import { usePathname } from "next/navigation"
+import { useLocale } from "next-intl"
 
 interface TopbarProps {
   data: any
 }
 
 export function Topbar({ data }: TopbarProps) {
+  const pathname = usePathname()
+  const locale = useLocale()
   if (!data || !data.text) return null
+
+  if (pathname === `/${locale}` || pathname === "/") {
+    const className = "block w-full bg-[#faedf0] px-4 py-1.5 text-center text-[0.8125rem] leading-4 text-[#693448]"
+
+    return data.href ? (
+      <Link href={data.href} className={className}>{data.text}</Link>
+    ) : (
+      <p className={className}>{data.text}</p>
+    )
+  }
 
   const backgroundColor =
     !data.backgroundColor || data.backgroundColor.toLowerCase() === "#e11d48"

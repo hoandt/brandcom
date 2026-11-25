@@ -35,9 +35,9 @@ export function LanguageSwitcher({ isTransparent }: { isTransparent?: boolean })
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        render={<Button variant="ghost" size="icon" aria-label="Switch language" className={isTransparent ? "text-white hover:text-white hover:bg-white/20" : ""} />}
+        render={<Button variant="ghost" size="icon" aria-label="Switch language" className={`h-10 w-10 sm:h-12 sm:w-12 ${isTransparent ? "text-white hover:bg-white/10 hover:text-white lg:hover:bg-white/20" : ""}`} />}
       >
-        <Globe className="h-5 w-5" />
+        <Globe className="size-[22px]" strokeWidth={1.65} />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         {languages.map((lang) => (

@@ -158,6 +158,10 @@
   @apply mx-auto w-full max-w-[1440px] px-4 sm:px-6 lg:px-8;
 }
 
+@utility storefront-blush-gradient {
+  @apply bg-gradient-to-br from-[#fff7f7] via-[#fdeeed] to-[#f7dcdb];
+}
+
 @keyframes marquee {
   0% { transform: translateX(0%); }
   100% { transform: translateX(-100%); }

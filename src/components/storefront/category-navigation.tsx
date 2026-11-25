@@ -139,7 +139,7 @@ export function DesktopCategoryMenu({ transparent, active, isOpen, onOpenChange 
         aria-expanded={open}
         aria-controls="desktop-catalogue-menu"
         onClick={() => setOpen(!open)}
-        className={`inline-flex items-center gap-1.5 border-b-2 py-3 font-heading text-[0.85rem] font-bold uppercase tracking-[0.15em] outline-none transition-colors focus:outline-none focus-visible:outline-none focus-visible:ring-0 ${activeBorder} ${linkColor}`}
+        className={`inline-flex items-center gap-1.5 border-b-2 py-3 font-sans text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 ${activeBorder} ${linkColor}`}
       >
         {t("shop")}<ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
@@ -150,7 +150,7 @@ export function DesktopCategoryMenu({ transparent, active, isOpen, onOpenChange 
           aria-modal="true"
           aria-label={t("catalogueMenu")}
           onClick={() => setOpen(false)}
-          className="absolute inset-x-0 top-[100%] h-[100vh] z-[100] bg-foreground/20 font-heading text-foreground backdrop-blur-[2px] animate-in fade-in duration-150"
+          className="absolute inset-x-0 top-[100%] h-[100vh] z-[100] bg-foreground/20 font-sans text-foreground backdrop-blur-[2px] animate-in fade-in duration-150"
         >
           <div
             onClick={(event) => event.stopPropagation()}
@@ -187,7 +187,7 @@ export function MobileCategoryMenu({ onNavigate }: { onNavigate: () => void }) {
   const items = useMemo(() => visibleItems(roots, selectedId), [roots, selectedId]);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col font-heading normal-case tracking-normal">
+    <div className="flex min-h-0 flex-1 flex-col font-sans normal-case tracking-normal">
       <div className="shrink-0 px-4">
         <CategoryTabs roots={roots} selectedId={selectedId} onSelect={setSelectedId} />
       </div>

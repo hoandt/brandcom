@@ -4,9 +4,8 @@ import { useState, useEffect } from "react"
 import { createPortal } from "react-dom"
 import { usePathname, useRouter } from "next/navigation"
 import Link from "next/link"
-import Image from "next/image"
 import { Logo } from "@/components/ui/logo"
-import { Search, Menu, User, ChevronDown, Globe, X, ShoppingBag, LogOut } from "lucide-react"
+import { Search, Menu, User, Globe, X, ShoppingBag, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useTranslations, useLocale } from "next-intl"
 import { LanguageSwitcher } from "./language-switcher"
@@ -26,7 +25,6 @@ import type { Session } from "next-auth"
 import { DesktopCategoryMenu, MobileCategoryMenu } from "./category-navigation"
 
 export function Navbar({ session, dynamicMenu, logoUrl }: { session: Session | null; dynamicMenu?: any[]; logoUrl?: string }) {
-  const [isScrolled, setIsScrolled] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
   const t = useTranslations("Navbar")
@@ -50,14 +48,6 @@ export function Navbar({ session, dynamicMenu, logoUrl }: { session: Session | n
   ];
 
   useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 200)
-    }
-    window.addEventListener("scroll", handleScroll)
-    return () => window.removeEventListener("scroll", handleScroll)
-  }, [])
-
-  useEffect(() => {
     if (!isMobileMenuOpen) return
 
     const previousOverflow = document.body.style.overflow
@@ -75,80 +65,59 @@ export function Navbar({ session, dynamicMenu, logoUrl }: { session: Session | n
   }, [isMobileMenuOpen])
 
   const isHomepage = pathname === `/${locale}` || pathname === "/"
-  const isTransparent = isHomepage && !isScrolled && !isCategoryOpen
   const isShopActive = ["/collections/", "/categories/", "/products/"].some((segment) => pathname.includes(segment)) || isCategoryOpen
+  const navigationLinkClass = "border-b-2 border-transparent py-3 font-sans text-sm font-medium text-muted-foreground transition-colors hover:border-current hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2"
 
   return (
     <header
-      className={`sticky top-0 z-50 w-full transition-all duration-300 ${isTransparent
-        ? "bg-gradient-to-b from-slate-500/10 to-transparent border-transparent"
-        : "bg-background/70 backdrop-blur-xl border-b border-border/50 shadow-sm"
+      className={`z-50 w-full border-b border-border/50 transition-all duration-300 ${isHomepage
+        ? "relative bg-white"
+        : "sticky top-0 bg-background/70 backdrop-blur-xl shadow-sm"
         }`}
     >
-      <div className={`storefront-container flex h-16 min-w-0 items-center justify-between gap-2 transition-colors duration-300 lg:h-20 ${isTransparent ? "text-white" : "text-foreground"}`}>
+      <div className="storefront-container flex h-[4.5rem] min-w-0 items-center justify-between gap-2 text-foreground transition-colors duration-300 lg:h-20">
 
         {/* Left Section: Logo & Desktop Links */}
-        <div className="flex min-w-0 shrink items-center gap-6 xl:gap-10">
+        <div className="flex h-full min-w-0 shrink items-center gap-6 xl:gap-10">
           <Link href={`/${locale}`} className="flex shrink-0 items-center">
-            <Logo logoUrl={logoUrl} className={`h-10 w-auto sm:h-11 lg:h-14 ${isTransparent ? "text-white" : "text-primary"}`} />
+            <Logo logoUrl={logoUrl} className="h-9 w-auto text-primary sm:h-11 lg:h-14" />
           </Link>
 
-          <nav className="hidden h-20 items-center gap-5 whitespace-nowrap text-[0.8rem] font-bold uppercase tracking-[0.12em] lg:flex xl:gap-8">
-            <DesktopCategoryMenu transparent={isTransparent} active={isShopActive} isOpen={isCategoryOpen} onOpenChange={setIsCategoryOpen} />
+          <nav className="hidden h-full items-center gap-5 whitespace-nowrap font-sans text-sm lg:flex xl:gap-8">
+            <DesktopCategoryMenu transparent={false} active={isShopActive} isOpen={isCategoryOpen} onOpenChange={setIsCategoryOpen} />
             {dynamicMenu && Array.isArray(dynamicMenu) && dynamicMenu.length > 0 ? (
               dynamicMenu.map((item, index) => (
-                <Link key={index} href={item.href.startsWith('/') && !item.href.startsWith(`/${locale}`) ? `/${locale}${item.href}` : item.href} className={`${isTransparent ? "text-white/90 hover:text-white" : "text-muted-foreground hover:text-foreground"} border-b-2 border-transparent py-3 font-heading text-[0.85rem] font-bold uppercase tracking-[0.15em] outline-none transition-colors hover:border-current focus-visible:outline-none focus-visible:ring-0`}>
+                <Link key={index} href={item.href.startsWith('/') && !item.href.startsWith(`/${locale}`) ? `/${locale}${item.href}` : item.href} className={navigationLinkClass}>
                   {item.label}
                 </Link>
               ))
             ) : (
-              <Link href={`/${locale}/pages/about-us`} className={`${isTransparent ? "text-white/90 hover:text-white" : "text-muted-foreground hover:text-foreground"} border-b-2 border-transparent py-3 font-heading text-[0.85rem] font-bold uppercase tracking-[0.15em] outline-none transition-colors hover:border-current focus-visible:outline-none focus-visible:ring-0`}>{t("aboutUs")}</Link>
+              <Link href={`/${locale}/pages/about-us`} className={navigationLinkClass}>{t("aboutUs")}</Link>
             )}
           </nav>
         </div>
 
         {/* Right Section: Search & Icons */}
-        <div className="flex min-w-0 shrink-0 items-center gap-1 lg:gap-2 xl:gap-4">
-
-          {/* Search Pill */}
-          <div className={`flex items-center rounded-full transition-all duration-300 overflow-hidden ${isSearchOpen ? "w-[180px] sm:w-[280px] px-4 h-11" : "w-0 px-0 h-11 pointer-events-none"
-            } ${isTransparent
-              ? "bg-white/20 text-white focus-within:bg-white/30"
-              : "bg-secondary text-foreground focus-within:ring-1 focus-within:ring-primary/20"
-            }`}>
-            <input
-              type="text"
-              placeholder={t("searchPlaceholder")}
-              className={`bg-transparent border-none outline-none text-sm w-full ${isTransparent ? "placeholder:text-white/70" : "placeholder:text-muted-foreground/70"}`}
-            />
-          </div>
-
-          <div className="flex items-center gap-1 md:gap-2">
+        <div className="flex h-full shrink-0 items-center sm:gap-1 md:gap-2">
             <Button
               variant="ghost"
               size="icon"
-              aria-label="Search"
+              aria-label={t("searchAction")}
+              aria-expanded={isSearchOpen}
+              aria-controls="storefront-search"
               onClick={() => setIsSearchOpen(!isSearchOpen)}
-              className={`${isTransparent ? "text-white hover:text-white hover:bg-white/20" : "text-foreground"}`}
+              className="h-10 w-10 text-foreground sm:h-12 sm:w-12"
             >
-              <Search className="h-5 w-5" />
+              <Search className="size-[22px]" strokeWidth={1.65} />
             </Button>
-            <CartIcon isTransparent={isTransparent} />
+            <CartIcon />
             {session?.user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger
                   render={
-                    <button aria-label={session.user.name || "Account"} className={`flex h-10 items-center gap-2 px-2 outline-none cursor-pointer rounded-full transition-colors hover:bg-muted/30 ${isTransparent ? "text-white hover:bg-white/20" : "text-foreground"}`}>
-                      <div className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border/50 bg-background text-foreground shadow-sm">
-                        {session.user.image ? (
-                          <Image src={session.user.image} alt={session.user.name || "User"} width={28} height={28} unoptimized className="h-full w-full object-cover" />
-                        ) : (
-                          <User className="h-4 w-4" />
-                        )}
-                      </div>
-                      <span className="hidden max-w-[100px] truncate text-xs font-bold xl:inline">{session.user.name}</span>
-                      <ChevronDown className="hidden h-3.5 w-3.5 opacity-60 xl:block" />
-                    </button>
+                    <Button variant="ghost" size="icon" aria-label={session.user.name || t("accountAction")} className="size-10 text-foreground sm:size-12">
+                      <User className="size-[22px]" strokeWidth={1.65} />
+                    </Button>
                   }
                 />
                 <DropdownMenuContent align="end" className="w-56 rounded-md bg-card p-1 shadow-lg border-border/50">
@@ -195,12 +164,10 @@ export function Navbar({ session, dynamicMenu, logoUrl }: { session: Session | n
               </DropdownMenu>
             ) : (
               <>
-                <LanguageSwitcher isTransparent={isTransparent} />
-                <Link href={`/${locale}/login`}>
-                  <Button variant="ghost" size="icon" aria-label="Account" className={`hidden sm:inline-flex ${isTransparent ? "text-white hover:text-white hover:bg-white/20" : "text-foreground"}`}>
-                    <User className="h-5 w-5" />
-                  </Button>
-                </Link>
+                <LanguageSwitcher />
+                <Button variant="ghost" size="icon" aria-label={t("accountAction")} className="size-10 text-foreground sm:size-12" render={<Link href={`/${locale}/login`} />}>
+                  <User className="size-[22px]" strokeWidth={1.65} />
+                </Button>
               </>
             )}
 
@@ -214,9 +181,9 @@ export function Navbar({ session, dynamicMenu, logoUrl }: { session: Session | n
               aria-expanded={isMobileMenuOpen}
               aria-controls="mobile-catalogue-menu"
               onClick={() => setIsMobileMenuOpen(true)}
-              className="lg:hidden"
+              className="h-10 w-10 text-foreground sm:h-12 sm:w-12 lg:hidden"
             >
-              <Menu className="h-6 w-6" />
+              <Menu className="size-6" strokeWidth={1.65} />
             </Button>
             {isMobileMenuOpen && typeof document !== "undefined" && createPortal(
               <div
@@ -224,7 +191,7 @@ export function Navbar({ session, dynamicMenu, logoUrl }: { session: Session | n
                 role="dialog"
                 aria-modal="true"
                 aria-label={t("menu")}
-                className="fixed inset-0 z-[100] flex h-dvh w-screen flex-col overflow-hidden bg-background font-heading text-foreground animate-in fade-in duration-150 lg:hidden"
+                className="fixed inset-0 z-[100] flex h-dvh w-screen flex-col overflow-hidden bg-background font-sans text-foreground animate-in fade-in duration-150 lg:hidden"
               >
                 <div className="storefront-container flex h-20 shrink-0 items-center border-b">
                   <Link href={`/${locale}`} onClick={() => setIsMobileMenuOpen(false)}><Logo logoUrl={logoUrl} className="h-11 w-auto text-primary" /></Link>
@@ -235,9 +202,19 @@ export function Navbar({ session, dynamicMenu, logoUrl }: { session: Session | n
               </div>,
               document.body,
             )}
-          </div>
         </div>
       </div>
+      {isSearchOpen && (
+        <div className="storefront-container pb-3">
+          <input
+            id="storefront-search"
+            type="search"
+            aria-label={t("searchAction")}
+            placeholder={t("searchPlaceholder")}
+            className="h-11 w-full max-w-md rounded-md border bg-white px-3 font-sans text-sm"
+          />
+        </div>
+      )}
     </header>
   )
 }

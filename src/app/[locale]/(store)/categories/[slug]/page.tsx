@@ -9,7 +9,16 @@ import { getTranslations } from "next-intl/server";
 import { ProductCard } from "@/components/storefront/product-card";
 import { getStoreSettings } from "@/lib/store-settings";
 import { storefrontCache } from "@/lib/storefront-cache";
-import { brandConfig } from "@/lib/brand-config";
+import { storefrontAlternates } from "@/lib/storefront-seo";
+
+function getCategory(slug: string, cacheSeconds: number) {
+  return storefrontCache(`category:${slug}:detail`, cacheSeconds, () =>
+    prisma.category.findUnique({
+      where: { slug },
+      include: { children: { where: { isActive: true }, orderBy: [{ position: "asc" }, { name: "asc" }] } },
+    }),
+  );
+}
 
 export async function generateMetadata({
   params,
@@ -18,12 +27,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { locale, slug } = await params;
   const settings = await getStoreSettings();
-  const category = await storefrontCache(`category:${slug}`, settings.categoryCacheSeconds, () =>
-    prisma.category.findUnique({
-      where: { slug },
-      select: { name: true, description: true, heroImageUrl: true, isActive: true },
-    })
-  );
+  const category = await getCategory(slug, settings.categoryCacheSeconds);
 
   if (!category || !category.isActive) {
     return {
@@ -32,25 +36,16 @@ export async function generateMetadata({
     };
   }
 
-  const siteUrl = brandConfig.siteUrl.replace(/\/$/, "");
-  const canonicalUrl = `${siteUrl}/${locale}/categories/${slug}`;
+  const alternates = storefrontAlternates(locale, `/categories/${slug}`);
 
   return {
     title: category.name,
     description: category.description || category.name,
-    alternates: {
-      canonical: canonicalUrl,
-      languages: {
-        vi: `${siteUrl}/vi/categories/${slug}`,
-        en: `${siteUrl}/en/categories/${slug}`,
-        th: `${siteUrl}/th/categories/${slug}`,
-        "x-default": `${siteUrl}/vi/categories/${slug}`,
-      },
-    },
+    alternates,
     openGraph: {
       title: category.name,
       description: category.description || category.name,
-      url: canonicalUrl,
+      url: alternates.canonical,
       type: "website",
       ...(category.heroImageUrl ? { images: [{ url: category.heroImageUrl, alt: category.name }] } : {}),
     },
@@ -67,10 +62,7 @@ export default async function CategoryPage({
   const settings = await getStoreSettings();
 
   const [category, allCategories] = await Promise.all([
-    storefrontCache(`category:${slug}`, settings.categoryCacheSeconds, () => prisma.category.findUnique({
-      where: { slug },
-      include: { children: { where: { isActive: true }, orderBy: [{ position: "asc" }, { name: "asc" }] } },
-    })),
+    getCategory(slug, settings.categoryCacheSeconds),
     storefrontCache("categories:paths", settings.categoryCacheSeconds, () => prisma.category.findMany({ where: { isActive: true }, select: { id: true, name: true, slug: true, parentId: true } })),
   ]);
 
@@ -106,7 +98,7 @@ export default async function CategoryPage({
           </div>
         </section>
       ) : (
-        <section className="relative -mt-20 flex h-[52vh] min-h-[26rem] max-h-[34rem] items-end overflow-hidden bg-gradient-to-br from-[#fff7f7] via-[#fdeeed] to-[#f7dcdb] pt-20 text-foreground">
+        <section className="storefront-blush-gradient relative -mt-20 flex h-[52vh] min-h-[26rem] max-h-[34rem] items-end overflow-hidden pt-20 text-foreground">
           <div className="storefront-container relative z-10 flex flex-col gap-4 pb-20 pt-24 md:flex-row md:items-end md:justify-between">
             <div><p className="mb-3 text-[10px] font-bold uppercase tracking-[0.22em] text-primary/75">{tNavbar("shopByCategory")}</p><h1 className="font-heading text-5xl tracking-tight md:text-6xl">{category.name}.</h1></div>
             {category.description && <p className="max-w-md text-sm leading-6 text-foreground/75 md:text-base">{category.description}</p>}

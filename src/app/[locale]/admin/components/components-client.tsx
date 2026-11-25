@@ -1,9 +1,12 @@
 "use client"
 
 import Link from "next/link"
+import { useLocale } from "next-intl"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
-import { Edit, Trash } from "lucide-react"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Edit, Plus, Trash } from "lucide-react"
+import { homepageMediaNames } from "@/lib/homepage-media"
 
 type ComponentType = {
   id: string
@@ -15,35 +18,60 @@ type ComponentType = {
   updatedAt: string
 }
 
-export function ComponentsClient({ initialComponents }: { initialComponents: ComponentType[] }) {
+export function ComponentsClient() {
   const queryClient = useQueryClient()
+  const locale = useLocale()
+  const componentPath = `/${locale}/admin/components`
 
-  const { data: components, isLoading } = useQuery({
+  const { data: components, isPending, isError, refetch } = useQuery({
     queryKey: ["admin-components"],
-    queryFn: async () => {
-      const res = await fetch("/api/admin/components")
+    queryFn: async ({ signal }) => {
+      const res = await fetch("/api/admin/components", { signal })
       if (!res.ok) throw new Error("Failed to fetch components")
       return res.json() as Promise<ComponentType[]>
     },
-    initialData: initialComponents,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
   })
 
   const deleteMutation = useMutation({
     mutationFn: async (code: string) => {
-      const res = await fetch(`/api/admin/components/${code}`, {
+      const res = await fetch(`/api/admin/components/${encodeURIComponent(code)}`, {
         method: "DELETE",
       })
       if (!res.ok) throw new Error("Failed to delete")
       return true
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-components"] })
+    onSuccess: (_, code) => {
+      queryClient.removeQueries({ queryKey: ["admin-components", code], exact: true })
+      void queryClient.invalidateQueries({ queryKey: ["admin-components"], exact: true })
     },
   })
 
   return (
-    <div className="rounded-none border bg-card">
-      <div className="overflow-x-auto">
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button render={<Link href={`${componentPath}/new`} />} className="h-9 rounded-none">
+          <Plus className="size-4" /> Create Component
+        </Button>
+        {components && Object.entries(homepageMediaNames).map(([code, name]) => {
+          const configured = components.some((component) => component.code === code)
+          return (
+            <Button key={code} variant="outline" className="h-9 rounded-none"
+              render={<Link href={`${componentPath}/${configured ? code : `new?type=${code}`}`} />}>
+              {name}
+            </Button>
+          )
+        })}
+      </div>
+      {isError && (
+        <div role="alert" className="flex items-center gap-3 text-sm text-destructive">
+          <p>Failed to load components.</p>
+          <Button type="button" variant="outline" size="sm" onClick={() => void refetch()}>Retry</Button>
+        </div>
+      )}
+      {deleteMutation.isError && <p role="alert" className="text-sm text-destructive">{deleteMutation.error.message}</p>}
+      <div className="overflow-x-auto rounded-none border bg-card">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b bg-muted/50 text-left text-xs uppercase text-muted-foreground">
@@ -55,9 +83,15 @@ export function ComponentsClient({ initialComponents }: { initialComponents: Com
             </tr>
           </thead>
           <tbody>
-            {isLoading ? (
-              <tr>
-                <td colSpan={5} className="p-4 text-center text-muted-foreground">Loading...</td>
+            {isPending ? (
+              <tr aria-busy="true">
+                <td colSpan={5} className="p-3">
+                  <div role="status" aria-label="Loading components" className="space-y-2">
+                    <Skeleton className="h-9 rounded-none" />
+                    <Skeleton className="h-9 rounded-none" />
+                    <Skeleton className="h-9 rounded-none" />
+                  </div>
+                </td>
               </tr>
             ) : components?.length === 0 ? (
               <tr>
@@ -84,12 +118,15 @@ export function ComponentsClient({ initialComponents }: { initialComponents: Com
                   </td>
                   <td className="p-3 text-right">
                     <div className="flex justify-end gap-2">
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" render={<Link href={`/admin/components/${comp.code}`} />}>
+                      <Button variant="ghost" size="icon" aria-label={`Edit ${comp.name}`} className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                        render={<Link href={`${componentPath}/${encodeURIComponent(comp.code)}`} />}>
                         <Edit className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="icon"
+                        aria-label={`Delete ${comp.name}`}
+                        disabled={deleteMutation.isPending}
                         className="h-8 w-8 text-destructive hover:bg-destructive/10"
                         onClick={() => {
                           if (confirm(`Delete component ${comp.code}?`)) {

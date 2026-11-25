@@ -1,32 +1,62 @@
+import type { Metadata, ResolvingMetadata } from "next";
+import { Suspense } from "react";
 import { getTranslations } from "next-intl/server";
-import { CollectionClient } from "./collection-client";
 import { notFound } from "next/navigation";
 import { CollectionCategoryNavigation } from "@/components/storefront/category-navigation";
+import { explorerCollections } from "@/lib/collection-explorer";
+import { homepageHeroImage } from "@/lib/homepage-hero-image";
+import { storefrontCollectionSlugs } from "@/lib/storefront-collections";
+import { storefrontAlternates, storefrontSiteUrl } from "@/lib/storefront-seo";
+import { CollectionProducts, CollectionProductsSkeleton } from "./collection-products";
 
-export default async function CollectionPage({
-  params,
-}: {
-  params: Promise<{ slug: string; locale: string }>;
-}) {
-  const { slug } = await params;
-  const validSlugs = ["new", "all"];
-  
-  if (!validSlugs.includes(slug)) {
+type Props = { params: Promise<{ slug: string; locale: string }> };
+
+const collectionCopy: Record<string, readonly [string, string]> = {
+  all: ["allProducts", "allCollectionDescription"],
+  new: ["newArrivals", "newCollectionDescription"],
+  breathable: ["breathableCollection", "breathableCollectionDescription"],
+  "adhesive-bras": ["adhesiveBrasCollection", "adhesiveBrasCollectionDescription"],
+  "bra-inserts": ["braInsertsCollection", "braInsertsCollectionDescription"],
+  "nipple-covers": ["nippleCoversCollection", "nippleCoversCollectionDescription"],
+};
+
+async function getCollectionDetails(slug: string, locale: string) {
+  if (!storefrontCollectionSlugs.includes(slug)) {
     notFound();
   }
 
-  const t = await getTranslations("Navbar");
+  const t = await getTranslations({ locale, namespace: "Navbar" });
+  const entry = explorerCollections.find((collection) => collection.slug === slug);
+  const copy = collectionCopy[slug];
+  const title = copy ? t(copy[0]) : entry?.label ?? "";
+  const description = copy ? t(copy[1]) : title;
+  const image = entry?.campaign.src ?? (slug === "breathable" ? "/banners/auria-nipple-cover.jpg" : homepageHeroImage.src);
 
-  let title = "";
-  let description = "";
+  return { title, description, image };
+}
 
-  if (slug === "new") {
-    title = t("newArrivals");
-    description = t("newCollectionDescription");
-  } else if (slug === "all") {
-    title = t("allProducts");
-    description = t("allCollectionDescription");
-  }
+export async function generateMetadata({ params }: Props, parent: ResolvingMetadata): Promise<Metadata> {
+  const { slug, locale } = await params;
+  const [{ title, description, image }, { openGraph }] = await Promise.all([
+    getCollectionDetails(slug, locale),
+    parent,
+  ]);
+  const alternates = storefrontAlternates(locale, `/collections/${slug}`);
+  const images = [{ url: new URL(image, storefrontSiteUrl).href, alt: title }];
+  const pageTitle = openGraph?.siteName ? `${title} | ${openGraph.siteName}` : title;
+
+  return {
+    title: { absolute: pageTitle },
+    description,
+    alternates,
+    openGraph: { ...openGraph, title: pageTitle, description, url: alternates.canonical, images },
+    twitter: { card: "summary_large_image", title: pageTitle, description, images },
+  };
+}
+
+export default async function CollectionPage({ params }: Props) {
+  const { slug, locale } = await params;
+  const { title, description } = await getCollectionDetails(slug, locale);
 
   return (
     <div className="storefront-container min-h-[60vh] py-12">
@@ -44,8 +74,9 @@ export default async function CollectionPage({
 
       <CollectionCategoryNavigation />
 
-      {/* Product Grid (Client Component) */}
-      <CollectionClient slug={slug} />
+      <Suspense fallback={<CollectionProductsSkeleton />}>
+        <CollectionProducts slug={slug} locale={locale} />
+      </Suspense>
     </div>
   );
 }

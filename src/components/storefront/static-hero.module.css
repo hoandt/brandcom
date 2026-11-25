@@ -1,0 +1,9 @@
+@media (max-width: 639px) and (orientation: portrait) {
+  .art {
+    aspect-ratio: 6 / 5;
+  }
+
+  .art img {
+    object-position: center 36%;
+  }
+}

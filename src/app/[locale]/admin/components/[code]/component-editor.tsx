@@ -2,11 +2,14 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { useLocale } from "next-intl"
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Plus, Trash, ArrowUp, ArrowDown, Check, ChevronsUpDown } from "lucide-react"
+import { homepageMediaNames, isHomepageMediaType, type HomepageMediaType } from "@/lib/homepage-media"
 import { cn } from "@/lib/utils"
 import {
   Command,
@@ -21,6 +24,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
+import { HomepageMediaEditor } from "./homepage-media-editor"
 
 type ComponentType = {
   id?: string
@@ -559,26 +563,91 @@ function FeaturedProductsBuilder({ value, onChange }: { value: any, onChange: (v
 // ----------------------------------------------------
 // EDITOR COMPONENT
 // ----------------------------------------------------
-export function ComponentEditor({ initialData }: { initialData: ComponentType | null }) {
+export function ComponentEditorScreen({ code, preset }: { code: string; preset?: HomepageMediaType }) {
+  const isNew = code === "new"
+  const query = useQuery({
+    queryKey: ["admin-components", code],
+    enabled: !isNew,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    queryFn: async ({ signal }): Promise<ComponentType> => {
+      const response = await fetch(`/api/admin/components/${encodeURIComponent(code)}`, { signal })
+      if (response.status === 404) throw new Error("Component not found.")
+      if (!response.ok) throw new Error("Failed to load the component.")
+      const data: ComponentType = await response.json()
+      if (typeof data.content === "string") {
+        try {
+          data.content = JSON.parse(data.content)
+        } catch {
+          // Keep legacy text available in the JSON editor.
+        }
+      }
+      return data
+    },
+  })
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">
+          {isNew ? "Create Component" : query.data ? `Edit Component: ${query.data.name}` : "Edit Component"}
+        </h1>
+        <p className="text-xs text-muted-foreground">
+          {isNew ? "Create a dynamic component for your storefront." : "Update component settings and content."}
+        </p>
+      </div>
+      {!isNew && query.isPending ? (
+        <div role="status" aria-label="Loading component" className="max-w-4xl space-y-4">
+          <Skeleton className="h-48 rounded-none" />
+          <Skeleton className="h-64 rounded-none" />
+        </div>
+      ) : !isNew && !query.data ? (
+        <div role="alert" className="flex items-center gap-3 text-sm text-destructive">
+          <p>{query.error?.message}</p>
+          <Button type="button" variant="outline" size="sm" onClick={() => void query.refetch()}>Retry</Button>
+        </div>
+      ) : (
+        <ComponentEditor key={isNew ? preset ?? "new" : code} initialData={query.data ?? null} preset={isNew ? preset : undefined} />
+      )}
+    </div>
+  )
+}
+
+function ComponentEditor({ initialData, preset }: { initialData: ComponentType | null; preset?: HomepageMediaType }) {
   const router = useRouter()
+  const locale = useLocale()
   const queryClient = useQueryClient()
   const isNew = !initialData
 
   const [formData, setFormData] = useState<ComponentType>(
     initialData || {
-      code: "",
-      name: "",
-      type: "menu",
-      content: [],
-      isActive: true,
+      code: preset ?? "",
+      name: preset ? homepageMediaNames[preset] : "",
+      type: preset ?? "menu",
+      content: preset ? { items: [] } : [],
+      isActive: !preset,
     }
   )
 
   const [jsonError, setJsonError] = useState("")
+  const isHomepageMedia = isHomepageMediaType(formData.type)
+
+  const uploadMutation = useMutation({
+    mutationFn: async (file: File): Promise<string> => {
+      const body = new FormData()
+      body.set("file", file)
+      const response = await fetch("/api/admin/upload", { method: "POST", body })
+      const data = await response.json().catch(() => null)
+      if (!response.ok || typeof data?.url !== "string") {
+        throw new Error(data?.error || "Failed to upload media.")
+      }
+      return data.url
+    },
+  })
 
   const saveMutation = useMutation({
-    mutationFn: async (data: ComponentType) => {
-      const url = isNew ? "/api/admin/components" : `/api/admin/components/${initialData.code}`
+    mutationFn: async (data: ComponentType): Promise<ComponentType> => {
+      const url = isNew ? "/api/admin/components" : `/api/admin/components/${encodeURIComponent(initialData.code)}`
       const method = isNew ? "POST" : "PATCH"
       const res = await fetch(url, {
         method,
@@ -586,23 +655,21 @@ export function ComponentEditor({ initialData }: { initialData: ComponentType | 
         body: JSON.stringify(data),
       })
       if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error || "Failed to save")
+        const err = await res.json().catch(() => null)
+        throw new Error(err?.error || "Failed to save")
       }
       return res.json()
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-components"] })
-      router.push("/admin/components")
-      router.refresh()
+    onSuccess: (saved) => {
+      queryClient.setQueryData(["admin-components", saved.code], saved)
+      void queryClient.invalidateQueries({ queryKey: ["admin-components"], exact: true })
+      router.push(`/${locale}/admin/components`)
     },
-    onError: (err) => {
-      alert(err.message)
-    }
   })
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    if (jsonError || uploadMutation.isPending || saveMutation.isPending) return
     saveMutation.mutate(formData)
   }
 
@@ -619,112 +686,148 @@ export function ComponentEditor({ initialData }: { initialData: ComponentType | 
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-8 max-w-4xl">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-card border p-6">
-        <div className="space-y-2">
-          <Label htmlFor="name">Component Name</Label>
-          <Input
-            id="name"
-            placeholder="e.g. Main Header Navbar"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            required
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="code">Component Code (Unique)</Label>
-          <Input
-            id="code"
-            placeholder="e.g. main-navbar"
-            value={formData.code}
-            onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-            disabled={!isNew}
-            required
-            className="font-mono"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="type">Component Type</Label>
-          <select
-            id="type"
-            value={formData.type}
-            onChange={(e) => {
-              const val = e.target.value;
-              setFormData({ ...formData, type: val, content: val === 'menu' || val === 'footer' ? [] : {} })
-            }}
-            className="h-12 w-full border border-input bg-background px-4 text-sm outline-none focus:border-ring rounded-none"
-          >
-            <option value="menu">Menu Builder</option>
-            <option value="footer">Footer Builder</option>
-            <option value="topbar">Topbar Builder</option>
-            <option value="theme-settings">Theme Settings</option>
-            <option value="hero">Hero Banner</option>
-            <option value="featured-products">Featured Products</option>
-            <option value="custom">Custom (JSON)</option>
-          </select>
-        </div>
-        <div className="space-y-2 flex flex-col justify-center">
-          <label className="flex items-center gap-2 cursor-pointer mt-6">
-            <input
-              type="checkbox"
-              checked={formData.isActive}
-              onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-              className="h-4 w-4 rounded-none border-gray-300 text-primary focus:ring-primary"
-            />
-            <span className="text-sm font-medium">Active (Visible in Storefront)</span>
-          </label>
-        </div>
-      </div>
-
-      <div className="bg-card border p-6 space-y-4">
-        <h2 className="text-lg font-bold">Component Content</h2>
-        
-        {formData.type === "menu" ? (
-          <MenuBuilder 
-            value={formData.content} 
-            onChange={(val) => setFormData({ ...formData, content: val })} 
-          />
-        ) : formData.type === "footer" ? (
-          <FooterBuilder
-            value={formData.content}
-            onChange={(val) => setFormData({ ...formData, content: val })}
-          />
-        ) : formData.type === "topbar" ? (
-          <TopbarBuilder
-            value={formData.content}
-            onChange={(val) => setFormData({ ...formData, content: val })}
-          />
-        ) : formData.type === "theme-settings" ? (
-          <ThemeBuilder
-            value={formData.content}
-            onChange={(val) => setFormData({ ...formData, content: val })}
-          />
-        ) : formData.type === "featured-products" ? (
-          <FeaturedProductsBuilder
-            value={formData.content}
-            onChange={(val) => setFormData({ ...formData, content: val })}
-          />
-        ) : (
+    <form onSubmit={handleSubmit} className="max-w-4xl">
+      <fieldset disabled={uploadMutation.isPending || saveMutation.isPending} className="min-w-0 space-y-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-card border p-6">
           <div className="space-y-2">
-            <Label htmlFor="json-config">JSON Configuration</Label>
-            <textarea
-              id="json-config"
-              className={`font-mono min-h-64 w-full border bg-background p-3 text-xs outline-none focus:border-ring rounded-none ${jsonError ? "border-destructive" : ""}`}
-              value={typeof formData.content === 'string' ? formData.content : JSON.stringify(formData.content, null, 2)}
-              onChange={handleJsonChange}
+            <Label htmlFor="name">Component Name</Label>
+            <Input
+              id="name"
+              placeholder="e.g. Main Header Navbar"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              required
             />
-            {jsonError && <p className="text-xs text-destructive">{jsonError}</p>}
-            <p className="text-xs text-muted-foreground">For non-menu components, provide the exact JSON structure required by the frontend.</p>
           </div>
-        )}
-      </div>
+          <div className="space-y-2">
+            <Label htmlFor="code">Component Code (Unique)</Label>
+            <Input
+              id="code"
+              placeholder="e.g. main-navbar"
+              value={formData.code}
+              onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+              disabled={!isNew || isHomepageMedia}
+              required
+              className="font-mono"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="type">Component Type</Label>
+            <select
+              id="type"
+              value={formData.type}
+              disabled={!isNew && isHomepageMediaType(formData.code)}
+              onChange={(e) => {
+                const type = e.target.value
+                setJsonError("")
+                uploadMutation.reset()
+                if (isNew && isHomepageMediaType(type)) {
+                  setFormData({
+                    code: type,
+                    type,
+                    name: homepageMediaNames[type],
+                    content: { items: [] },
+                    isActive: false,
+                  })
+                } else {
+                  setFormData({
+                    ...formData,
+                    code: isNew && isHomepageMedia ? "" : formData.code,
+                    type,
+                    content: type === "menu" || type === "footer" ? [] : {},
+                  })
+                }
+              }}
+              className="h-12 w-full border border-input bg-background px-4 text-sm outline-none focus:border-ring rounded-none"
+            >
+              <option value="menu">Menu Builder</option>
+              <option value="footer">Footer Builder</option>
+              <option value="topbar">Topbar Builder</option>
+              <option value="theme-settings">Theme Settings</option>
+              <option value="hero">Hero Banner</option>
+              <option value="featured-products">Featured Products</option>
+              {(isNew || isHomepageMediaType(formData.code)) && (
+                <>
+                  <option value="logo-marquee">{homepageMediaNames["logo-marquee"]}</option>
+                  <option value="video-social-preview">{homepageMediaNames["video-social-preview"]}</option>
+                </>
+              )}
+              <option value="custom">Custom (JSON)</option>
+            </select>
+          </div>
+          <div className="space-y-2 flex flex-col justify-center">
+            <label className="flex items-center gap-2 cursor-pointer mt-6">
+              <input
+                type="checkbox"
+                checked={formData.isActive}
+                onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+                className="h-4 w-4 rounded-none border-gray-300 text-primary focus:ring-primary"
+              />
+              <span className="text-sm font-medium">Active (Visible in Storefront)</span>
+            </label>
+          </div>
+        </div>
 
-      <div className="flex justify-end gap-4">
-        <Button type="button" variant="outline" onClick={() => router.back()}>Cancel</Button>
-        <Button type="submit" disabled={saveMutation.isPending || !!jsonError}>
-          {saveMutation.isPending ? "Saving..." : isNew ? "Create Component" : "Save Changes"}
-        </Button>
-      </div>
+        <div className="bg-card border p-6 space-y-4">
+          <h2 className="text-lg font-bold">Component Content</h2>
+
+          {isHomepageMediaType(formData.type) ? (
+            <HomepageMediaEditor
+              type={formData.type}
+              value={formData.content}
+              onChange={(content) => setFormData({ ...formData, content })}
+              onUpload={uploadMutation.mutateAsync}
+            />
+          ) : formData.type === "menu" ? (
+            <MenuBuilder
+              value={formData.content}
+              onChange={(val) => setFormData({ ...formData, content: val })}
+            />
+          ) : formData.type === "footer" ? (
+            <FooterBuilder
+              value={formData.content}
+              onChange={(val) => setFormData({ ...formData, content: val })}
+            />
+          ) : formData.type === "topbar" ? (
+            <TopbarBuilder
+              value={formData.content}
+              onChange={(val) => setFormData({ ...formData, content: val })}
+            />
+          ) : formData.type === "theme-settings" ? (
+            <ThemeBuilder
+              value={formData.content}
+              onChange={(val) => setFormData({ ...formData, content: val })}
+            />
+          ) : formData.type === "featured-products" ? (
+            <FeaturedProductsBuilder
+              value={formData.content}
+              onChange={(val) => setFormData({ ...formData, content: val })}
+            />
+          ) : (
+            <div className="space-y-2">
+              <Label htmlFor="json-config">JSON Configuration</Label>
+              <textarea
+                id="json-config"
+                className={`font-mono min-h-64 w-full border bg-background p-3 text-xs outline-none focus:border-ring rounded-none ${jsonError ? "border-destructive" : ""}`}
+                value={typeof formData.content === 'string' ? formData.content : JSON.stringify(formData.content, null, 2)}
+                onChange={handleJsonChange}
+              />
+              {jsonError && <p className="text-xs text-destructive">{jsonError}</p>}
+              <p className="text-xs text-muted-foreground">For non-menu components, provide the exact JSON structure required by the frontend.</p>
+            </div>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-4">
+          <Button type="button" variant="outline" onClick={() => router.back()}>Cancel</Button>
+          <Button type="submit" disabled={saveMutation.isPending || !!jsonError}>
+            {saveMutation.isPending ? "Saving..." : isNew ? "Create Component" : "Save Changes"}
+          </Button>
+        </div>
+      </fieldset>
+      {uploadMutation.isPending && <p role="status" className="mt-3 text-sm text-muted-foreground">Uploading media…</p>}
+      {uploadMutation.isError && <p role="alert" className="mt-3 text-sm text-destructive">{uploadMutation.error.message}</p>}
+      {saveMutation.isError && <p role="alert" className="mt-3 text-sm text-destructive">{saveMutation.error.message}</p>}
     </form>
   )
 }

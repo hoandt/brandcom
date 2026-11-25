@@ -17,7 +17,7 @@ import { getDynamicComponent } from "@/lib/dynamic-components";
 const oldStandardTT = Old_Standard_TT({
   weight: ["400", "700"],
   subsets: ["latin", "vietnamese"],
-  variable: "--font-heading",
+  variable: "--font-heading-fallback",
 });
 
 import { getStoreSettings } from "@/lib/store-settings";
@@ -79,8 +79,8 @@ export default async function RootLayout({ children, params }: Props) {
     ? `"${themeSettings.fontSans}", sans-serif`
     : undefined;
   const fontHeading = themeSettings.fontHeading && themeSettings.fontHeading !== "Old Standard TT"
-    ? `"${themeSettings.fontHeading}", serif`
-    : undefined;
+    ? `"${themeSettings.fontHeading}"`
+    : "var(--font-heading-fallback)";
 
   const dynamicStyles = {
     "--primary": primaryColor,
@@ -89,7 +89,7 @@ export default async function RootLayout({ children, params }: Props) {
     ...(headingColor && { "--heading-color": headingColor }),
     "--radius": radius,
     ...(fontSans && { "--font-sans": fontSans }),
-    ...(fontHeading && { "--font-heading": fontHeading }),
+    "--font-heading": fontHeading,
   } as React.CSSProperties;
 
   const customFonts = [];

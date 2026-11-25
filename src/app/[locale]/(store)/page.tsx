@@ -1,71 +1,65 @@
-import type { Metadata } from "next"
-import { getLocale } from "next-intl/server"
-import { VideoHero } from "@/components/storefront/video-hero"
+import type { Metadata, ResolvingMetadata } from "next"
+import { getLocale, getTranslations } from "next-intl/server"
+import { StaticHero } from "@/components/storefront/static-hero"
+import { AuriaBareSpotlight } from "@/components/storefront/auria-bare-spotlight"
+import { HomepageMedia } from "@/components/storefront/homepage-media"
+import { CollectionExplorer } from "@/components/storefront/collection-explorer"
 import { Suspense } from "react"
 import { FeaturedProducts, FeaturedProductsSkeleton } from "@/components/storefront/featured-products"
-import { FeaturedCategories, FeaturedCategoriesSkeleton } from "@/components/storefront/featured-categories"
-import { getDynamicComponentsByType, type FeaturedProductsComponent } from "@/lib/dynamic-components"
-import { brandConfig } from "@/lib/brand-config"
+import { homepageHeroImage } from "@/lib/homepage-hero-image"
+import { getStoreSettings } from "@/lib/store-settings"
+import { storefrontAlternates, storefrontSiteUrl } from "@/lib/storefront-seo"
 
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<{ locale: string }>
-}): Promise<Metadata> {
+export async function generateMetadata(
+  { params }: { params: Promise<{ locale: string }> },
+  parent: ResolvingMetadata,
+): Promise<Metadata> {
   const { locale } = await params
-  const siteUrl = brandConfig.siteUrl.replace(/\/$/, "")
+  const [{ openGraph }, settings, t] = await Promise.all([
+    parent,
+    getStoreSettings(),
+    getTranslations({ locale, namespace: "Homepage" }),
+  ])
+  const isDefaultLocale = locale === settings.defaultLocale
+  const title = (isDefaultLocale && settings.seoTitle?.trim()) || t("seoTitle")
+  const description = (isDefaultLocale && settings.seoDescription?.trim()) || t("seoDescription")
+  const alternates = storefrontAlternates(locale)
+  const heroImage = {
+    url: `${storefrontSiteUrl}${homepageHeroImage.src}`,
+    width: homepageHeroImage.width,
+    height: homepageHeroImage.height,
+    alt: t("heroImageAlt"),
+  }
 
   return {
-    alternates: {
-      canonical: `${siteUrl}/${locale}`,
-      languages: {
-        vi: `${siteUrl}/vi`,
-        en: `${siteUrl}/en`,
-        th: `${siteUrl}/th`,
-        "x-default": `${siteUrl}/vi`,
-      },
+    title: { absolute: title },
+    description,
+    alternates,
+    openGraph: {
+      ...openGraph,
+      title,
+      description,
+      url: alternates.canonical,
+      images: [heroImage, ...(openGraph?.images ?? [])],
     },
+    twitter: { card: "summary_large_image", title, description, images: [heroImage] },
   }
 }
 
 export default async function StorefrontPage() {
   const locale = await getLocale()
 
-  const featuredProductConfigs = await getDynamicComponentsByType<FeaturedProductsComponent>("featured-products")
-  
-  // Sort them by `order` field inside the config, or fallback to 0
-  featuredProductConfigs.sort((a, b) => {
-    const orderA = a.data?.order || 0
-    const orderB = b.data?.order || 0
-    return orderA - orderB
-  })
-
   return (
-    <div className="flex flex-col -mt-20">
-      {/* Hero Section */}
-      <VideoHero 
-        desktopVideoUrl="https://image.uniqlo.com/UQ/CMS/video/jp/2026/HOME/GL_Aseets/Campaign/Inner/inner-w-movie01-pc-2-1.mp4"
-        mobileVideoUrl="https://image.uniqlo.com/UQ/CMS/video/jp/2026/HOME/GL_Aseets/Campaign/Inner/inner-w-movie01-sp-1-1.mp4"
-        locale={locale}
-      />
-
-      {/* Featured Categories */}
-      <Suspense fallback={<FeaturedCategoriesSkeleton />}>
-        <FeaturedCategories locale={locale} />
+    <div className="bg-[#fbf8f3]">
+      <StaticHero />
+      <Suspense fallback={null}>
+        <HomepageMedia locale={locale} />
       </Suspense>
-
-      {/* Featured Products */}
-      {featuredProductConfigs.length > 0 ? (
-        featuredProductConfigs.map((comp) => (
-          <Suspense key={comp.code} fallback={<FeaturedProductsSkeleton />}>
-            <FeaturedProducts locale={locale} config={comp.data} />
-          </Suspense>
-        ))
-      ) : (
-        <Suspense fallback={<FeaturedProductsSkeleton />}>
-          <FeaturedProducts locale={locale} />
-        </Suspense>
-      )}
+      <CollectionExplorer locale={locale} />
+      <Suspense fallback={<FeaturedProductsSkeleton />}>
+        <FeaturedProducts locale={locale} />
+      </Suspense>
+      <AuriaBareSpotlight locale={locale} />
     </div>
   )
 }

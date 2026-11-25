@@ -20,7 +20,8 @@ export const config = {
     // - API routes
     // - _next (static files)
     // - metadata files (e.g. favicon.ico, sitemap.xml, robots.txt)
-    '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)',
+    // - public storefront banners
+    '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|banners/).*)',
     // Match all locales
     '/',
     '/(en|vi|th)/:path*'
