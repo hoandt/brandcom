@@ -62,6 +62,7 @@ export function SocialVideoPreview({ items, heading }: {
 
     const observer = new IntersectionObserver(([entry]) => {
       setVisibleRatio(entry.intersectionRatio)
+      if (entry.intersectionRatio < autoplayVisibility) setHoveredSlot(null)
     }, { threshold: [hoverVisibility, autoplayVisibility] })
     observer.observe(list)
 
