@@ -43,6 +43,7 @@ export function useLoopingVideoCarousel(count: number) {
   const scrollTarget = useRef<number | null>(null)
   const initialized = useRef(false)
   const [centered, setCentered] = useState(padding)
+  const [settledCenter, setSettledCenter] = useState<number | null>(null)
 
   useLayoutEffect(() => {
     const element = track.current
@@ -87,9 +88,11 @@ export function useLoopingVideoCarousel(count: number) {
       previousCenter = canonical
 
       const target = scrollTarget.current
-      if (target === canonical) scrollTarget.current = null
-      else if (target !== null) {
+      if (target !== null && target !== canonical) {
         scrollToCenter(list, list.children[scrollDestination(target, count, padding)])
+      } else {
+        scrollTarget.current = null
+        setSettledCenter(canonical)
       }
     }
 
@@ -104,6 +107,10 @@ export function useLoopingVideoCarousel(count: number) {
           frame = null
           previousCenter = nearestSlide(list)
           setCentered(previousCenter)
+          const snappedCenter = scrollTarget.current === null && Math.abs(centerOffset(list, list.children[previousCenter])) < 1
+            ? previousCenter
+            : null
+          setSettledCenter((current) => current === snappedCenter ? current : null)
         })
       }
       if (!hasScrollEnd) scheduleFallback()
@@ -120,6 +127,7 @@ export function useLoopingVideoCarousel(count: number) {
         scrollTarget.current = null
         const canonical = padding + wrapVideoIndex(previousCenter - padding, count)
         scrollToCenter(list, list.children[canonical], "instant")
+        setSettledCenter(canonical)
       }
       queuePosition()
     })
@@ -133,7 +141,12 @@ export function useLoopingVideoCarousel(count: number) {
       list.addEventListener("touchcancel", endTouch, { passive: true })
     }
     setCentered(previousCenter)
-    if (previousCenter < padding || previousCenter >= padding + count) scheduleFallback()
+    if (previousCenter < padding || previousCenter >= padding + count) {
+      setSettledCenter(null)
+      scheduleFallback()
+    } else {
+      setSettledCenter(previousCenter)
+    }
 
     return () => {
       if (frame !== null) cancelAnimationFrame(frame)
@@ -155,9 +168,11 @@ export function useLoopingVideoCarousel(count: number) {
         Math.abs(centerOffset(list, slide)) < 1) {
       scrollTarget.current = null
       if (previous !== null) scrollToCenter(list, slide, "instant")
+      setSettledCenter(destination)
       return
     }
     scrollTarget.current = index
+    setSettledCenter(null)
     if (previous !== null && scrollDestination(previous, count, padding) === destination) return
     scrollToCenter(list, slide)
   }
@@ -179,5 +194,5 @@ export function useLoopingVideoCarousel(count: number) {
     scrollTarget.current = null
   }
 
-  return { track, centered, padding, move, centerIfNeeded, resetScrollTarget, scrollTarget }
+  return { track, centered, settledCenter, padding, move, centerIfNeeded, resetScrollTarget }
 }

@@ -1,6 +1,6 @@
 .carousel {
   --vertical-padding: 2rem;
-  --video-width: min(76vw, 25rem);
+  --video-width: min(76vw, 25rem, max(12rem, 45svh));
   --video-gap: 0.75rem;
   --navigation-inset: 0.5rem;
   padding-block: var(--vertical-padding);
@@ -10,6 +10,10 @@
   grid-auto-columns: var(--video-width);
   gap: var(--video-gap);
   padding-inline: calc((100% - var(--video-width)) / 2);
+}
+
+.frame {
+  aspect-ratio: 9 / 16;
 }
 
 .productOverlay {
@@ -50,7 +54,7 @@
   position: absolute;
   z-index: 2;
   inset-inline: var(--navigation-inset);
-  top: calc(var(--vertical-padding) + var(--video-width) * 2 / 3);
+  top: calc(var(--vertical-padding) + var(--video-width) * 8 / 9);
   transform: translateY(-50%);
   justify-content: space-between;
   pointer-events: none;
@@ -73,7 +77,7 @@
 @media (min-width: 40rem) {
   .carousel {
     --vertical-padding: 2.75rem;
-    --video-width: clamp(13.5rem, 22vw, 32rem);
+    --video-width: min(clamp(13.5rem, 22vw, 32rem), max(13.5rem, 45svh));
     --video-gap: clamp(0.9rem, 1.15vw, 1.5rem);
     --navigation-inset: clamp(1rem, 2.6vw, 3rem);
   }

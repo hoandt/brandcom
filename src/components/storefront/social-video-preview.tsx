@@ -4,35 +4,72 @@ import { useEffect, useRef, useState, type KeyboardEvent } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { useTranslations } from "next-intl"
-import { ArrowRight, ArrowUpRight, ChevronLeft, ChevronRight, Play, ShoppingBag, X } from "lucide-react"
+import { ArrowRight, ArrowUpRight, ChevronLeft, ChevronRight, Pause, Play, ShoppingBag, X } from "lucide-react"
 import type { SocialVideoFeedItem } from "@/lib/homepage-media"
 import styles from "./social-video-preview.module.css"
 import { useLoopingVideoCarousel, wrapVideoIndex } from "./use-looping-video-carousel"
 
-type Playback = { index: number; mode: "preview" | "manual" }
+type PlaybackOverride = { index: number; mode: "manual" | "paused" }
 
 const mediaGrade = "[filter:saturate(.88)_sepia(.08)_contrast(.97)_brightness(1.025)]"
 const cornerIcon = "grid size-7 place-items-center rounded-full border border-white/70 bg-black/15 text-white backdrop-blur-[2px]"
 const mediaFocus = "focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-white"
+const cornerButton = `absolute top-0 right-0 grid size-11 place-items-center ${mediaFocus}`
 const navigationButton = "grid size-11 shrink-0 place-items-center rounded-full text-[#684e59] focus-visible:outline-2 focus-visible:outline-offset-2"
 const overlayAction = `${styles.overlayAction} rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white`
+const hoverVisibility = 0.25
+const autoplayVisibility = 0.5
 
 export function SocialVideoPreview({ items, heading }: {
   items: SocialVideoFeedItem[]
   heading: string
 }) {
   const t = useTranslations("Homepage.media")
-  const { track, centered, padding, move, centerIfNeeded, resetScrollTarget, scrollTarget } = useLoopingVideoCarousel(items.length)
+  const { track, centered, settledCenter, padding, move, centerIfNeeded, resetScrollTarget } = useLoopingVideoCarousel(items.length)
   const players = useRef<(HTMLVideoElement | null)[]>([])
-  const [playback, setPlayback] = useState<Playback | null>(null)
+  const centerControl = useRef<HTMLButtonElement>(null)
+  const [playbackOverride, setPlaybackOverride] = useState<PlaybackOverride | null>(null)
   const [failedClip, setFailedClip] = useState<number | null>(null)
+  const [hoveredSlot, setHoveredSlot] = useState<number | null>(null)
+  const [visibleRatio, setVisibleRatio] = useState(0)
+  const [pageVisible, setPageVisible] = useState(false)
+  const [reducedMotion, setReducedMotion] = useState(true)
   const selectedClip = wrapVideoIndex(centered - padding, items.length)
-  const activeIndex = playback?.index
-  const manualPlayback = playback?.mode === "manual"
+  const centeredOnVideo = centered >= padding && centered < padding + items.length && Boolean(items[selectedClip]?.videoUrl)
+  const override = playbackOverride?.index === selectedClip ? playbackOverride.mode : undefined
+  const hoverPreview = hoveredSlot === centered && visibleRatio >= hoverVisibility
+  const manualIndex = centeredOnVideo && override === "manual" ? selectedClip : undefined
+  const previewIndex = centeredOnVideo && centered === settledCenter && !override && failedClip !== selectedClip &&
+    pageVisible && !reducedMotion && (visibleRatio >= autoplayVisibility || hoverPreview) ? selectedClip : undefined
+  const activeIndex = manualIndex ?? previewIndex
 
   useEffect(() => {
-    setPlayback((current) => current?.index === selectedClip ? current : null)
+    setPlaybackOverride((current) => current?.index === selectedClip ? current : null)
   }, [selectedClip])
+
+  useEffect(() => {
+    const list = track.current
+    if (!list) return
+
+    const motion = window.matchMedia("(prefers-reduced-motion: reduce)")
+    const syncMotion = () => setReducedMotion(motion.matches)
+    const syncVisibility = () => setPageVisible(!document.hidden)
+    syncMotion()
+    syncVisibility()
+    motion.addEventListener("change", syncMotion)
+    document.addEventListener("visibilitychange", syncVisibility)
+
+    const observer = new IntersectionObserver(([entry]) => {
+      setVisibleRatio(entry.intersectionRatio)
+    }, { threshold: [hoverVisibility, autoplayVisibility] })
+    observer.observe(list)
+
+    return () => {
+      observer.disconnect()
+      motion.removeEventListener("change", syncMotion)
+      document.removeEventListener("visibilitychange", syncVisibility)
+    }
+  }, [track])
 
   useEffect(() => {
     if (activeIndex === undefined) return
@@ -47,46 +84,44 @@ export function SocialVideoPreview({ items, heading }: {
   }, [activeIndex])
 
   useEffect(() => {
-    if (activeIndex === undefined) return
-    const video = players.current[activeIndex]
+    if (previewIndex === undefined) return
+    const video = players.current[previewIndex]
     if (!video) return
 
-    if (manualPlayback) video.focus({ preventScroll: true })
-    else video.muted = true
-    if (video.paused) void video.play().catch(() => undefined)
-    const observer = new IntersectionObserver(([entry]) => {
-      if (entry.intersectionRatio >= 0.25) return
-      video.pause()
-      if (!manualPlayback) {
-        setPlayback((current) => current?.index === activeIndex && current.mode === "preview" ? null : current)
-      }
-    }, { threshold: 0.25 })
-    observer.observe(video)
-    return () => observer.disconnect()
-  }, [activeIndex, manualPlayback])
+    let requested = true
+    video.muted = true
+    void video.play().catch(() => {
+      if (!requested) return
+      setPlaybackOverride((current) => current ?? { index: previewIndex, mode: "paused" })
+    })
+    return () => { requested = false }
+  }, [previewIndex])
 
-  function preview(index: number, slot: number, pointerType: string) {
-    if (!items[index].videoUrl || failedClip === index || pointerType !== "mouse" ||
-        centered !== slot || scrollTarget.current !== null ||
-        !window.matchMedia("(hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference)").matches) {
-      return
+  useEffect(() => {
+    if (manualIndex !== undefined) players.current[manualIndex]?.focus({ preventScroll: true })
+  }, [manualIndex])
+
+  useEffect(() => {
+    if (manualIndex !== undefined && (!pageVisible || visibleRatio < hoverVisibility)) {
+      players.current[manualIndex]?.pause()
     }
-    setPlayback((current) => current?.mode === "manual" ? current : { index, mode: "preview" })
-  }
+  }, [manualIndex, pageVisible, visibleRatio])
 
-  function stopPreview(index: number) {
-    setPlayback((current) => current?.index === index && current.mode === "preview" ? null : current)
+  function previewOnHover(slot: number, pointerType: string) {
+    if (pointerType === "mouse" && window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
+      setHoveredSlot(slot)
+    }
   }
 
   function togglePlayback(index: number, slot: number, isPreviewCopy: boolean) {
     if (centerIfNeeded(slot) || isPreviewCopy) return
-    if (activeIndex === index && manualPlayback) {
-      setPlayback(null)
+    if (manualIndex === index) {
+      setPlaybackOverride({ index, mode: "paused" })
       return
     }
     void players.current[index]?.play().catch(() => undefined)
     setFailedClip(null)
-    setPlayback({ index, mode: "manual" })
+    setPlaybackOverride({ index, mode: "manual" })
   }
 
   function handleArrowKey(event: KeyboardEvent<HTMLUListElement>) {
@@ -118,8 +153,8 @@ export function SocialVideoPreview({ items, heading }: {
             const clip = items[index]
             const isPreviewCopy = slot < padding || slot >= padding + items.length
             const isActive = !isPreviewCopy && activeIndex === index
-            const isManual = isActive && manualPlayback
-            const isPreview = isActive && !isManual
+            const isManual = !isPreviewCopy && manualIndex === index
+            const isPreview = !isPreviewCopy && previewIndex === index
             const offset = slot - centered
             const needsCentering = offset !== 0
             return (
@@ -133,9 +168,9 @@ export function SocialVideoPreview({ items, heading }: {
                 data-side={offset < 0 ? "left" : offset > 0 ? "right" : undefined}
               >
                 <div
-                  className={`${styles.frame} relative aspect-[3/4] overflow-hidden rounded-[6px] bg-[#e9dedb]`}
-                  onPointerEnter={isPreviewCopy ? undefined : (event) => preview(index, slot, event.pointerType)}
-                  onPointerLeave={isPreviewCopy ? undefined : () => stopPreview(index)}
+                  className={`${styles.frame} relative overflow-hidden rounded-[6px] bg-[#e9dedb]`}
+                  onPointerEnter={isPreviewCopy || !clip.videoUrl ? undefined : (event) => previewOnHover(slot, event.pointerType)}
+                  onPointerLeave={() => setHoveredSlot((current) => current === slot ? null : current)}
                 >
                   {clip.videoUrl && !isPreviewCopy ? (
                     <video
@@ -154,7 +189,7 @@ export function SocialVideoPreview({ items, heading }: {
                       onError={() => {
                         if (!isActive) return
                         setFailedClip(index)
-                        setPlayback((current) => current?.index === index ? null : current)
+                        setPlaybackOverride((current) => current?.index === index ? null : current)
                       }}
                     />
                   ) : (
@@ -170,16 +205,19 @@ export function SocialVideoPreview({ items, heading }: {
                   {clip.videoUrl || isPreviewCopy ? (
                     <button
                       type="button"
+                      ref={!isPreviewCopy && !needsCentering ? centerControl : undefined}
                       tabIndex={isPreviewCopy ? -1 : undefined}
                       aria-label={t(isManual ? "closeVideo" : needsCentering || isPreviewCopy ? "selectVideo" : "playVideo", { title: clip.title })}
-                      className={`group absolute ${isManual ? "top-0 right-0 grid size-11 place-items-center" : "inset-0"} ${mediaFocus}`}
+                      className={isManual ? cornerButton : `group absolute inset-0 ${mediaFocus}`}
                       onClick={() => togglePlayback(index, slot, isPreviewCopy)}
                     >
-                      <span className={`${cornerIcon} ${isManual ? "" : "absolute top-2 right-2"} ${isPreview || needsCentering ? "opacity-0 group-focus-visible:opacity-100" : ""}`}>
-                        {isManual ? <X className="size-3.5" strokeWidth={1.35} aria-hidden />
-                          : clip.videoUrl ? <Play className="size-3" strokeWidth={1.5} aria-hidden />
-                            : <ArrowUpRight className="size-3.5" strokeWidth={1.35} aria-hidden />}
-                      </span>
+                      {!isPreview && (
+                        <span className={`${cornerIcon} ${isManual ? "" : "absolute top-2 right-2"} ${needsCentering ? "opacity-0 group-focus-visible:opacity-100" : ""}`}>
+                          {isManual ? <X className="size-3.5" strokeWidth={1.35} aria-hidden />
+                            : clip.videoUrl ? <Play className="size-3" strokeWidth={1.5} aria-hidden />
+                              : <ArrowUpRight className="size-3.5" strokeWidth={1.35} aria-hidden />}
+                        </span>
+                      )}
                     </button>
                   ) : (
                     <a
@@ -194,6 +232,21 @@ export function SocialVideoPreview({ items, heading }: {
                         <ArrowUpRight className="size-3.5" strokeWidth={1.35} aria-hidden />
                       </span>
                     </a>
+                  )}
+                  {isPreview && (
+                    <button
+                      type="button"
+                      aria-label={t("pauseVideo", { title: clip.title })}
+                      className={cornerButton}
+                      onClick={() => {
+                        setPlaybackOverride({ index, mode: "paused" })
+                        centerControl.current?.focus({ preventScroll: true })
+                      }}
+                    >
+                      <span className={cornerIcon}>
+                        <Pause className="size-3" strokeWidth={1.5} aria-hidden />
+                      </span>
+                    </button>
                   )}
                   <div className={styles.productOverlay} data-controls={isManual || undefined}>
                     {clip.product ? (

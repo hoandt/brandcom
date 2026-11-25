@@ -171,6 +171,7 @@
       "previousVideos": "Video trước",
       "nextVideos": "Video tiếp theo",
       "playVideo": "Phát video {title}",
+      "pauseVideo": "Tạm dừng video {title}",
       "selectVideo": "Chuyển đến video {title}",
       "closeVideo": "Đóng video {title}",
       "openVideo": "Mở bài đăng {title}",

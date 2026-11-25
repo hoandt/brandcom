@@ -171,6 +171,7 @@
       "previousVideos": "Previous video",
       "nextVideos": "Next video",
       "playVideo": "Play {title}",
+      "pauseVideo": "Pause {title}",
       "selectVideo": "Go to video {title}",
       "closeVideo": "Close video {title}",
       "openVideo": "Open post for {title}",
