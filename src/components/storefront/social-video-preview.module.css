@@ -1,0 +1,119 @@
+.carousel {
+  --vertical-padding: 2rem;
+  --video-width: min(76vw, 25rem);
+  --video-gap: 0.75rem;
+  --navigation-inset: 0.5rem;
+  padding-block: var(--vertical-padding);
+}
+
+.track {
+  grid-auto-columns: var(--video-width);
+  gap: var(--video-gap);
+  padding-inline: calc((100% - var(--video-width)) / 2);
+}
+
+.productOverlay {
+  --fade-height: 2.75rem;
+  position: absolute;
+  inset: auto 0 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: var(--fade-height) 0.75rem 0.75rem;
+  color: white;
+  background: linear-gradient(
+    to bottom,
+    rgb(48 25 37 / 0),
+    rgb(48 25 37 / 0.28) 1.25rem,
+    rgb(48 25 37 / 0.78) var(--fade-height),
+    rgb(48 25 37 / 0.94)
+  );
+  pointer-events: none;
+}
+
+.productOverlay[data-controls="true"] {
+  bottom: 4rem;
+  mask-image: linear-gradient(to bottom, black calc(100% - 0.75rem), transparent);
+}
+
+.slide:not([data-centered="true"]) .productOverlay:not(:focus-within) {
+  opacity: 0;
+}
+
+.slide[data-centered="true"] .overlayAction,
+.productOverlay:focus-within .overlayAction {
+  pointer-events: auto;
+}
+
+.navigation {
+  position: absolute;
+  z-index: 2;
+  inset-inline: var(--navigation-inset);
+  top: calc(var(--vertical-padding) + var(--video-width) * 2 / 3);
+  transform: translateY(-50%);
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.navigation button {
+  border: 1px solid rgb(100 43 67 / 0.14);
+  background: rgb(255 249 248 / 0.94);
+  box-shadow: 0 2px 8px rgb(71 33 50 / 0.08);
+  pointer-events: auto;
+}
+
+@media (max-width: 39.999rem) {
+  .slide:not([data-centered="true"]) .frame {
+    transform: scale(0.91);
+    opacity: 0.82;
+  }
+}
+
+@media (min-width: 40rem) {
+  .carousel {
+    --vertical-padding: 2.75rem;
+    --video-width: clamp(13.5rem, 22vw, 32rem);
+    --video-gap: clamp(0.9rem, 1.15vw, 1.5rem);
+    --navigation-inset: clamp(1rem, 2.6vw, 3rem);
+  }
+
+  .slide[data-distance="1"] {
+    --angle: 12deg;
+    --scale: 0.91;
+    --opacity: 0.9;
+  }
+
+  .slide[data-distance="2"] {
+    --angle: 19deg;
+    --scale: 0.82;
+    --opacity: 0.7;
+  }
+
+  .slide[data-side="right"] {
+    --direction: -1;
+  }
+
+  .slide:not([data-centered="true"]) .frame {
+    transform: perspective(64rem) rotateY(calc(var(--angle) * var(--direction, 1))) scale(var(--scale));
+    opacity: var(--opacity);
+  }
+
+  .slide[data-centered="true"] .frame {
+    box-shadow: 0 18px 28px -22px rgb(71 33 50 / 0.28);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .frame {
+    transition: transform 260ms ease-out, opacity 220ms ease-out;
+  }
+
+  .productOverlay {
+    transition: opacity 180ms ease-out;
+  }
+
+  .track[data-rebasing="true"] :is(.frame, .productOverlay) {
+    transition: none;
+  }
+}

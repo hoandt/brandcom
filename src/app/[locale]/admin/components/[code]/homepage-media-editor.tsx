@@ -5,12 +5,14 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import type { HomepageMediaType, LogoMarqueeContent, SocialVideoContent } from "@/lib/homepage-media"
 import { ArrowDown, ArrowUp, Plus, Trash } from "lucide-react"
+import { useTranslations } from "next-intl"
 
 type Logo = LogoMarqueeContent["items"][number]
 type Clip = SocialVideoContent["items"][number]
 type MediaField = keyof Logo | keyof Clip
 type EditorValue = {
   heading?: string
+  includeBundledVideos?: boolean
   items?: (Logo | Clip)[]
 }
 
@@ -59,6 +61,7 @@ export function HomepageMediaEditor({ type, value, onChange, onUpload }: {
   onUpload: (file: File) => Promise<string>
 }) {
   const isLogo = type === "logo-marquee"
+  const t = useTranslations("Homepage.media")
   const items = Array.isArray(value?.items) ? value.items : []
   const itemLabel = isLogo ? "logo" : "video"
 
@@ -103,6 +106,18 @@ export function HomepageMediaEditor({ type, value, onChange, onUpload }: {
           ? "Add retailer names and logo images. A destination link is optional."
           : "Use a vertical cover image for each clip. Upload an MP4 or WebM for inline playback, or link to a social post."}
       </p>
+
+      {!isLogo && (
+        <label className="flex items-center gap-2 text-sm font-medium">
+          <input
+            type="checkbox"
+            checked={value?.includeBundledVideos !== false}
+            onChange={(event) => onChange({ ...value, includeBundledVideos: event.target.checked })}
+            className="size-4 accent-primary focus-visible:outline-2 focus-visible:outline-offset-2"
+          />
+          {t("includeBundledVideos")}
+        </label>
+      )}
 
       {items.map((item, index) => (
         <div key={index} className="space-y-4 border bg-muted/15 p-4">

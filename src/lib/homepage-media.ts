@@ -54,6 +54,7 @@ export const logoMarqueeSchema = z.object({
 
 export const socialVideoSchema = z.object({
   heading,
+  includeBundledVideos: z.boolean().optional(),
   items: z.array(z.object({
     title: z.string().trim().min(1, "Enter a video title.").max(120),
     posterUrl: publicUrl,
@@ -68,6 +69,11 @@ export const socialVideoSchema = z.object({
 
 export type LogoMarqueeContent = z.infer<typeof logoMarqueeSchema>
 export type SocialVideoContent = z.infer<typeof socialVideoSchema>
+export type SocialVideoClip = SocialVideoContent["items"][number] & { relatedProduct?: boolean }
+
+export type SocialVideoFeedItem = SocialVideoClip & {
+  product?: { title: string; image?: string; price: string }
+}
 
 export function validateHomepageMedia(code: string, type: unknown, content: unknown) {
   if (code !== type || !isHomepageMediaType(type)) {

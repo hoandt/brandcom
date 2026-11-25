@@ -1,0 +1,87 @@
+.frame {
+  position: relative;
+  isolation: isolate;
+  aspect-ratio: 1;
+  border: 1px solid rgb(71 33 50 / 0.06);
+  border-radius: 6px;
+  background: #fef2f2;
+}
+
+.imageLink,
+.imageLayer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+.packshot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--packshot-width);
+  height: auto;
+  transform: translate(var(--packshot-x, -50%), var(--packshot-y, -50%));
+  /* The lower edge of this catalogue template contains a printed benefit strip. */
+  clip-path: inset(0 0 21%);
+}
+
+.imageLayer:has(.fallbackImage) {
+  mix-blend-mode: multiply;
+}
+
+.fallbackImage {
+  padding: 10%;
+  object-fit: contain;
+}
+
+.contactShadow {
+  position: absolute;
+  top: var(--packshot-shadow-top);
+  left: 16%;
+  width: 68%;
+  height: 9%;
+  background: radial-gradient(ellipse, rgb(71 33 50 / 0.12), transparent 69%);
+}
+
+.quickAdd {
+  position: absolute;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  z-index: 1;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .quickAdd {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .card:hover .quickAdd,
+  .card:focus-within .quickAdd {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .frame {
+    transition: box-shadow 240ms ease;
+  }
+
+  .card:hover .frame {
+    box-shadow: 0 10px 22px -14px rgb(71 33 50 / 0.25);
+  }
+
+  .imageLayer {
+    transition: transform 400ms ease;
+  }
+
+  .card:hover .imageLayer {
+    transform: scale(1.04);
+  }
+
+  .quickAdd {
+    transition: opacity 180ms ease;
+  }
+}

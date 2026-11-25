@@ -1,11 +1,10 @@
 "use client";
 
 import { getImageProps } from "next/image";
-import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
-import { ArrowRight } from "lucide-react";
 
 import { homepageHeroImage } from "@/lib/homepage-hero-image";
+import { StorefrontArrowLink } from "./storefront-arrow-link";
 import styles from "./static-hero.module.css";
 
 const phonePortraitMedia = "(max-width: 639px) and (orientation: portrait)";
@@ -48,8 +47,7 @@ export function StaticHero() {
             sizes={tabletImage.sizes}
             srcSet={tabletImage.srcSet ?? homepageHeroImage.tabletSrc}
           />
-          {/* eslint-disable-next-line @next/next/no-img-element -- srcSet is optimized by getImageProps. */}
-          <img {...desktopImage} />
+          <img {...desktopImage} alt={imageOptions.alt} />
         </picture>
       </div>
 
@@ -74,13 +72,9 @@ export function StaticHero() {
         <p className="mt-6 max-w-[26rem] text-pretty text-base leading-relaxed tracking-[0.025em] text-[#58464b]">
           {t("heroSubtitle")}
         </p>
-        <Link
-          href={`/${locale}/collections/breathable`}
-          className="group mt-5 inline-flex min-h-11 max-w-full items-center gap-2 font-sans text-sm font-semibold leading-5 text-[#642b43] no-underline transition-colors hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-4"
-        >
-          <span>{t("shopBreathable")}</span>
-          <ArrowRight aria-hidden="true" className="size-4 shrink-0 motion-safe:transition-transform motion-safe:group-hover:translate-x-0.5" />
-        </Link>
+        <StorefrontArrowLink href={`/${locale}/collections/breathable`} className="mt-5">
+          {t("shopBreathable")}
+        </StorefrontArrowLink>
       </div>
     </section>
   );

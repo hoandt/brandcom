@@ -1,57 +1,59 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, type KeyboardEvent } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { useTranslations } from "next-intl"
-import { ArrowRight, ArrowUpRight, ChevronLeft, ChevronRight, Play, X } from "lucide-react"
-import type { SocialVideoContent } from "@/lib/homepage-media"
+import { ArrowRight, ArrowUpRight, ChevronLeft, ChevronRight, Play, ShoppingBag, X } from "lucide-react"
+import type { SocialVideoFeedItem } from "@/lib/homepage-media"
+import styles from "./social-video-preview.module.css"
+import { useLoopingVideoCarousel, wrapVideoIndex } from "./use-looping-video-carousel"
 
 type Playback = { index: number; mode: "preview" | "manual" }
 
 const mediaGrade = "[filter:saturate(.88)_sepia(.08)_contrast(.97)_brightness(1.025)]"
 const cornerIcon = "grid size-7 place-items-center rounded-full border border-white/70 bg-black/15 text-white backdrop-blur-[2px]"
 const mediaFocus = "focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-white"
-const navigationButton = "grid size-11 shrink-0 place-items-center rounded-full text-[#684e59] enabled:hover:bg-[#f0e7e4] focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-30"
+const navigationButton = "grid size-11 shrink-0 place-items-center rounded-full text-[#684e59] focus-visible:outline-2 focus-visible:outline-offset-2"
+const overlayAction = `${styles.overlayAction} rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white`
 
-export function SocialVideoPreview({ content, heading, locale }: {
-  content: SocialVideoContent
+export function SocialVideoPreview({ items, heading }: {
+  items: SocialVideoFeedItem[]
   heading: string
-  locale: string
 }) {
   const t = useTranslations("Homepage.media")
-  const track = useRef<HTMLUListElement>(null)
-  const player = useRef<HTMLVideoElement>(null)
+  const { track, centered, padding, move, centerIfNeeded, resetScrollTarget, scrollTarget } = useLoopingVideoCarousel(items.length)
+  const players = useRef<(HTMLVideoElement | null)[]>([])
   const [playback, setPlayback] = useState<Playback | null>(null)
   const [failedClip, setFailedClip] = useState<number | null>(null)
-  const [edges, setEdges] = useState({ start: true, end: true })
+  const selectedClip = wrapVideoIndex(centered - padding, items.length)
   const activeIndex = playback?.index
   const manualPlayback = playback?.mode === "manual"
 
   useEffect(() => {
-    const list = track.current
-    if (!list) return
-
-    const updateEdges = () => {
-      const start = list.scrollLeft <= 1
-      const end = list.scrollLeft + list.clientWidth >= list.scrollWidth - 1
-      setEdges((previous) => previous.start === start && previous.end === end ? previous : { start, end })
-    }
-    const observer = new ResizeObserver(updateEdges)
-    observer.observe(list)
-    list.addEventListener("scroll", updateEdges, { passive: true })
-    updateEdges()
-    return () => {
-      observer.disconnect()
-      list.removeEventListener("scroll", updateEdges)
-    }
-  }, [])
+    setPlayback((current) => current?.index === selectedClip ? current : null)
+  }, [selectedClip])
 
   useEffect(() => {
-    const video = player.current
-    if (!video || activeIndex === undefined) return
+    if (activeIndex === undefined) return
+    const video = players.current[activeIndex]
+    if (!video) return
+
+    return () => {
+      if (document.activeElement === video) video.blur()
+      video.pause()
+      video.load()
+    }
+  }, [activeIndex])
+
+  useEffect(() => {
+    if (activeIndex === undefined) return
+    const video = players.current[activeIndex]
+    if (!video) return
 
     if (manualPlayback) video.focus({ preventScroll: true })
+    else video.muted = true
+    if (video.paused) void video.play().catch(() => undefined)
     const observer = new IntersectionObserver(([entry]) => {
       if (entry.intersectionRatio >= 0.25) return
       video.pause()
@@ -63,8 +65,9 @@ export function SocialVideoPreview({ content, heading, locale }: {
     return () => observer.disconnect()
   }, [activeIndex, manualPlayback])
 
-  function preview(index: number, pointerType: string) {
-    if (!content.items[index].videoUrl || failedClip === index || pointerType !== "mouse" ||
+  function preview(index: number, slot: number, pointerType: string) {
+    if (!items[index].videoUrl || failedClip === index || pointerType !== "mouse" ||
+        centered !== slot || scrollTarget.current !== null ||
         !window.matchMedia("(hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference)").matches) {
       return
     }
@@ -75,21 +78,22 @@ export function SocialVideoPreview({ content, heading, locale }: {
     setPlayback((current) => current?.index === index && current.mode === "preview" ? null : current)
   }
 
-  function togglePlayback(index: number) {
+  function togglePlayback(index: number, slot: number, isPreviewCopy: boolean) {
+    if (centerIfNeeded(slot) || isPreviewCopy) return
     if (activeIndex === index && manualPlayback) {
       setPlayback(null)
       return
     }
-    if (activeIndex === index) void player.current?.play().catch(() => undefined)
+    void players.current[index]?.play().catch(() => undefined)
     setFailedClip(null)
     setPlayback({ index, mode: "manual" })
   }
 
-  function move(direction: -1 | 1) {
-    const list = track.current
-    if (!list || list.children.length < 2) return
-    const step = list.children[1].getBoundingClientRect().left - list.children[0].getBoundingClientRect().left
-    list.scrollBy({ left: direction * step })
+  function handleArrowKey(event: KeyboardEvent<HTMLUListElement>) {
+    if (event.target !== event.currentTarget || event.altKey || event.ctrlKey || event.metaKey) return
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return
+    event.preventDefault()
+    move(event.key === "ArrowLeft" ? -1 : 1)
   }
 
   return (
@@ -98,42 +102,57 @@ export function SocialVideoPreview({ content, heading, locale }: {
       aria-label={heading}
       className="scroll-mt-20 bg-gradient-to-br from-[#fdf2f2] to-[#fae8e8]"
     >
-      <div className="storefront-container py-8 sm:py-10 lg:py-12">
+      <div className={`${styles.carousel} relative`}>
         <ul
           ref={track}
           id="storefront-social-videos"
-          className="grid snap-x snap-mandatory auto-cols-[min(74vw,16rem)] grid-flow-col gap-5 overflow-x-auto overscroll-x-contain pb-2 [scrollbar-width:none] motion-safe:scroll-smooth sm:auto-cols-[calc((100%-3rem)/3)] sm:gap-6 lg:auto-cols-[calc((100%-6rem)/4)] lg:gap-8"
+          tabIndex={0}
+          aria-label={heading}
+          onKeyDown={handleArrowKey}
+          onPointerDown={resetScrollTarget}
+          onWheel={resetScrollTarget}
+          className={`${styles.track} grid snap-x snap-mandatory grid-flow-col overflow-x-auto overscroll-x-contain pb-2 [scrollbar-width:none] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary motion-safe:scroll-smooth`}
         >
-          {content.items.map((clip, index) => {
-            const isActive = activeIndex === index
+          {Array.from({ length: items.length + padding * 2 }, (_, slot) => {
+            const index = wrapVideoIndex(slot - padding, items.length)
+            const clip = items[index]
+            const isPreviewCopy = slot < padding || slot >= padding + items.length
+            const isActive = !isPreviewCopy && activeIndex === index
             const isManual = isActive && manualPlayback
             const isPreview = isActive && !isManual
-            const productHref = clip.productUrl.startsWith("/") && !/^\/(vi|en|th)(\/|$)/.test(clip.productUrl)
-              ? `/${locale}${clip.productUrl}`
-              : clip.productUrl
-
+            const offset = slot - centered
+            const needsCentering = offset !== 0
             return (
-              <li key={index} className="min-w-0 snap-start">
+              <li
+                key={slot}
+                className={`${styles.slide} min-w-0 snap-center`}
+                aria-hidden={isPreviewCopy || undefined}
+                onMouseDown={isPreviewCopy ? (event) => event.preventDefault() : undefined}
+                data-centered={!needsCentering}
+                data-distance={Math.min(2, Math.abs(offset))}
+                data-side={offset < 0 ? "left" : offset > 0 ? "right" : undefined}
+              >
                 <div
-                  className="relative aspect-[3/4] overflow-hidden rounded-[6px] bg-[#e9dedb]"
-                  onPointerEnter={(event) => preview(index, event.pointerType)}
-                  onPointerLeave={() => stopPreview(index)}
+                  className={`${styles.frame} relative aspect-[3/4] overflow-hidden rounded-[6px] bg-[#e9dedb]`}
+                  onPointerEnter={isPreviewCopy ? undefined : (event) => preview(index, slot, event.pointerType)}
+                  onPointerLeave={isPreviewCopy ? undefined : () => stopPreview(index)}
                 >
-                  {isActive ? (
+                  {clip.videoUrl && !isPreviewCopy ? (
                     <video
-                      ref={player}
+                      ref={(element) => { players.current[index] = element }}
                       src={clip.videoUrl}
                       poster={clip.posterUrl}
+                      preload="none"
                       aria-label={clip.title}
                       aria-hidden={!isManual || undefined}
                       tabIndex={isManual ? 0 : -1}
                       className={`size-full ${mediaGrade} ${isManual ? "bg-[#261b20] object-contain" : "object-cover object-[center_42%]"}`}
-                      autoPlay
                       controls={isManual}
-                      loop={!isManual}
+                      loop={isPreview}
                       muted
                       playsInline
                       onError={() => {
+                        if (!isActive) return
                         setFailedClip(index)
                         setPlayback((current) => current?.index === index ? null : current)
                       }}
@@ -141,22 +160,25 @@ export function SocialVideoPreview({ content, heading, locale }: {
                   ) : (
                     <Image
                       src={clip.posterUrl}
-                      alt={clip.title}
+                      alt={isPreviewCopy ? "" : clip.title}
                       fill
                       unoptimized
-                      sizes="(min-width: 64rem) 25vw, (min-width: 40rem) 33vw, 74vw"
+                      sizes="(min-width: 40rem) clamp(13.5rem, 22vw, 32rem), min(76vw, 25rem)"
                       className={`object-cover object-[center_42%] ${mediaGrade}`}
                     />
                   )}
-                  {clip.videoUrl ? (
+                  {clip.videoUrl || isPreviewCopy ? (
                     <button
                       type="button"
-                      aria-label={t(isManual ? "closeVideo" : "playVideo", { title: clip.title })}
+                      tabIndex={isPreviewCopy ? -1 : undefined}
+                      aria-label={t(isManual ? "closeVideo" : needsCentering || isPreviewCopy ? "selectVideo" : "playVideo", { title: clip.title })}
                       className={`group absolute ${isManual ? "top-0 right-0 grid size-11 place-items-center" : "inset-0"} ${mediaFocus}`}
-                      onClick={() => togglePlayback(index)}
+                      onClick={() => togglePlayback(index, slot, isPreviewCopy)}
                     >
-                      <span className={`${cornerIcon} ${isManual ? "" : "absolute top-2 right-2"} ${isPreview ? "opacity-0 group-focus-visible:opacity-100" : ""}`}>
-                        {isManual ? <X className="size-3.5" strokeWidth={1.35} aria-hidden /> : <Play className="size-3" strokeWidth={1.5} aria-hidden />}
+                      <span className={`${cornerIcon} ${isManual ? "" : "absolute top-2 right-2"} ${isPreview || needsCentering ? "opacity-0 group-focus-visible:opacity-100" : ""}`}>
+                        {isManual ? <X className="size-3.5" strokeWidth={1.35} aria-hidden />
+                          : clip.videoUrl ? <Play className="size-3" strokeWidth={1.5} aria-hidden />
+                            : <ArrowUpRight className="size-3.5" strokeWidth={1.35} aria-hidden />}
                       </span>
                     </button>
                   ) : (
@@ -164,50 +186,73 @@ export function SocialVideoPreview({ content, heading, locale }: {
                       href={clip.socialUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      aria-label={t("openVideo", { title: clip.title })}
+                      aria-label={t(needsCentering ? "selectVideo" : "openVideo", { title: clip.title })}
+                      onClick={(event) => { if (centerIfNeeded(slot)) event.preventDefault() }}
                       className={`absolute inset-0 ${mediaFocus}`}
                     >
-                      <span className={`${cornerIcon} absolute top-2 right-2`}>
+                      <span className={`${cornerIcon} absolute top-2 right-2 ${needsCentering ? "opacity-0" : ""}`}>
                         <ArrowUpRight className="size-3.5" strokeWidth={1.35} aria-hidden />
                       </span>
                     </a>
                   )}
-                </div>
-                <div className="mt-3 flex items-start gap-3">
-                  <h3 className="m-0 min-w-0 flex-1 text-pretty font-sans text-[10px] font-medium leading-relaxed tracking-[0.09em] text-[#5e4c54] uppercase sm:text-[11px]">
-                    {productHref ? (
-                      <Link href={productHref} className="flex min-h-6 items-start justify-between gap-2 hover:text-[#472132] focus-visible:outline-2 focus-visible:outline-offset-2">
-                        <span>{clip.title}</span>
-                        <ArrowRight className="mt-px size-3.5 shrink-0 text-[#806e75]" strokeWidth={1.35} aria-hidden />
+                  <div className={styles.productOverlay} data-controls={isManual || undefined}>
+                    {clip.product ? (
+                      <Link
+                        href={clip.productUrl}
+                        tabIndex={isPreviewCopy ? -1 : undefined}
+                        prefetch={false}
+                        className={`${overlayAction} group flex min-w-0 flex-1 items-center gap-2.5`}
+                      >
+                        <span className="relative grid size-12 shrink-0 place-items-center overflow-hidden rounded-sm bg-[#fef2f2]">
+                          {clip.product.image ? (
+                            <Image src={clip.product.image} alt="" fill sizes="48px" className="object-cover object-top" />
+                          ) : (
+                            <ShoppingBag aria-hidden="true" className="size-4 text-primary/65" strokeWidth={1.5} />
+                          )}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          {clip.relatedProduct && <span className="block text-[10px] leading-4 text-[#f8dce5]">{t("relatedProduct")}</span>}
+                          <span className="line-clamp-2 text-[13px] leading-4">{clip.product.title}</span>
+                          <span className="mt-1 block text-xs leading-4 tabular-nums text-[#f8dce5]">{clip.product.price}</span>
+                        </span>
+                        <ArrowRight aria-hidden="true" className="size-3.5 shrink-0 text-[#f8dce5] motion-safe:transition-transform motion-safe:group-hover:translate-x-0.5" strokeWidth={1.5} />
                       </Link>
-                    ) : clip.title}
-                  </h3>
-                  {clip.videoUrl && clip.socialUrl && (
-                    <a
-                      href={clip.socialUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label={t("openVideo", { title: clip.title })}
-                      className="shrink-0 text-[#806e75] hover:text-[#472132] focus-visible:outline-2 focus-visible:outline-offset-2"
-                    >
-                      <ArrowUpRight className="mt-px size-3.5" strokeWidth={1.35} aria-hidden />
-                    </a>
-                  )}
+                    ) : clip.productUrl ? (
+                      <Link href={clip.productUrl} tabIndex={isPreviewCopy ? -1 : undefined} prefetch={false}
+                        className={`${overlayAction} flex min-h-11 min-w-0 flex-1 items-center justify-between gap-2 text-[13px] leading-4`}>
+                        <span className="line-clamp-2">{clip.title}</span>
+                        <ArrowRight aria-hidden="true" className="size-3.5 shrink-0" strokeWidth={1.5} />
+                      </Link>
+                    ) : (
+                      <span className="flex-1 text-[13px] leading-4">{clip.title}</span>
+                    )}
+                    {!isPreviewCopy && clip.videoUrl && clip.socialUrl && (
+                      <a
+                        href={clip.socialUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={t("openVideo", { title: clip.title })}
+                        className={`${overlayAction} grid size-11 shrink-0 place-items-center text-[#f8dce5] hover:text-white`}
+                      >
+                        <ArrowUpRight className="size-3.5" strokeWidth={1.35} aria-hidden />
+                      </a>
+                    )}
+                  </div>
                 </div>
-                {failedClip === index && <p role="status" className="mt-1 text-xs text-[#642b43]">{t("videoError")}</p>}
+                {!isPreviewCopy && failedClip === index && <p role="status" className="mt-1 text-xs text-[#642b43]">{t("videoError")}</p>}
               </li>
             )
           })}
         </ul>
-        {(!edges.start || !edges.end) && (
-          <div className="mt-1 flex justify-end">
+        {items.length > 1 && (
+          <div className={`${styles.navigation} flex`}>
             <button type="button" aria-label={t("previousVideos")} aria-controls="storefront-social-videos"
-              className={navigationButton} disabled={edges.start} onClick={() => move(-1)}>
-              <ChevronLeft className="size-4" strokeWidth={1.35} aria-hidden />
+              className={navigationButton} onClick={() => move(-1)}>
+              <ChevronLeft className="size-4 sm:size-5" strokeWidth={1.35} aria-hidden />
             </button>
             <button type="button" aria-label={t("nextVideos")} aria-controls="storefront-social-videos"
-              className={navigationButton} disabled={edges.end} onClick={() => move(1)}>
-              <ChevronRight className="size-4" strokeWidth={1.35} aria-hidden />
+              className={navigationButton} onClick={() => move(1)}>
+              <ChevronRight className="size-4 sm:size-5" strokeWidth={1.35} aria-hidden />
             </button>
           </div>
         )}
