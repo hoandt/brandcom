@@ -5,6 +5,7 @@ import { isHomepageMediaType, validateHomepageMedia } from "@/lib/homepage-media
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
+import { PRODUCT_PROMOTION_CODE } from "@/lib/product-promotion";
 
 export async function GET() {
   if (!isAdminEmail((await auth())?.user?.email)) {
@@ -39,6 +40,10 @@ export async function POST(req: Request) {
         typeof type !== "string" || !type ||
         (isActive !== undefined && typeof isActive !== "boolean")) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
+
+    if (code === PRODUCT_PROMOTION_CODE || type === PRODUCT_PROMOTION_CODE) {
+      return NextResponse.json({ error: "Use the Product Page Promotions component editor." }, { status: 400 });
     }
 
     let savedContent = content ?? {};

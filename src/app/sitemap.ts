@@ -7,20 +7,22 @@ import { storefrontCollectionSlugs } from "@/lib/storefront-collections";
 import { storefrontAlternates, storefrontLocales, storefrontSiteUrl } from "@/lib/storefront-seo";
 import type { MetadataRoute } from "next";
 
+export const dynamic = "force-dynamic";
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const [videoContent, products, categories, pages] = await Promise.all([
     getHomepageVideoContent("vi"),
     prisma.product.findMany({
       where: { status: "ACTIVE" },
-      select: { slug: true, updatedAt: true },
+      select: { slug: true },
     }),
     prisma.category.findMany({
       where: { isActive: true },
-      select: { slug: true, updatedAt: true },
+      select: { slug: true },
     }),
     prisma.page.findMany({
       where: { isActive: true },
-      select: { slug: true, updatedAt: true },
+      select: { slug: true },
     }),
   ]);
   const videoPosters = videoContent?.items
@@ -42,8 +44,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       const { canonical, languages } = storefrontAlternates(locale, path);
       return {
         url: canonical,
-        changeFrequency: "daily" as const,
-        priority: path === "" ? 1.0 : 0.8,
         alternates: { languages },
         images: path === "" ? homeImages : undefined,
       };
@@ -55,9 +55,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       const { canonical, languages } = storefrontAlternates(locale, `/products/${p.slug}`);
       return {
         url: canonical,
-        lastModified: p.updatedAt,
-        changeFrequency: "weekly" as const,
-        priority: 0.9,
         alternates: { languages },
       };
     }),
@@ -68,9 +65,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       const { canonical, languages } = storefrontAlternates(locale, `/categories/${c.slug}`);
       return {
         url: canonical,
-        lastModified: c.updatedAt,
-        changeFrequency: "weekly" as const,
-        priority: 0.85,
         alternates: { languages },
       };
     }),
@@ -81,9 +75,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       const { canonical, languages } = storefrontAlternates(locale, `/pages/${page.slug}`);
       return {
         url: canonical,
-        lastModified: page.updatedAt,
-        changeFrequency: "monthly" as const,
-        priority: 0.6,
         alternates: { languages },
       };
     }),

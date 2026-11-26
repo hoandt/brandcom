@@ -11,6 +11,7 @@ import Providers from "@/components/providers";
 import NextTopLoader from 'nextjs-toploader';
 import { Suspense } from "react";
 import { MarketingPixels } from "@/components/analytics/marketing-pixels";
+import { GoogleAnalytics } from "@/components/analytics/google-analytics";
 import { brandConfig } from "@/lib/brand-config";
 import { getDynamicComponent } from "@/lib/dynamic-components";
 
@@ -112,6 +113,7 @@ export default async function RootLayout({ children, params }: Props) {
         {googleFontsUrl && <link href={googleFontsUrl} rel="stylesheet" />}
       </head>
       <body className={`antialiased ${oldStandardTT.variable}`} style={dynamicStyles}>
+        <GoogleAnalytics />
         <Suspense fallback={null}>
           <MarketingPixels
             gaMeasurementId={process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID}

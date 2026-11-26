@@ -8,6 +8,7 @@ import { getCategoryPath } from "@/lib/categories";
 import { getTranslations } from "next-intl/server";
 import { getStoreSettings } from "@/lib/store-settings";
 import { storefrontCache } from "@/lib/storefront-cache";
+import { getProductPromotion } from "@/lib/product-promotion.server";
 
 type Props = {
   params: Promise<{ locale: string; slug: string }>;
@@ -117,7 +118,7 @@ export default async function ProductPage({ params }: Props) {
     notFound();
   }
 
-  const [settings, allCategories, tProduct, tNavbar] = await Promise.all([
+  const [settings, allCategories, tProduct, tNavbar, promotion] = await Promise.all([
     getStoreSettings(),
     prisma.category.findMany({
       where: { isActive: true },
@@ -125,6 +126,7 @@ export default async function ProductPage({ params }: Props) {
     }),
     getTranslations("Product"),
     getTranslations("Navbar"),
+    locale === "vi" ? getProductPromotion(slug) : null,
   ]);
   const categoryPath = product.categories
     .map((category) => getCategoryPath(allCategories, category.id))
@@ -241,6 +243,11 @@ export default async function ProductPage({ params }: Props) {
         />
 
         <ProductClient
+          key={product.id}
+          promotion={promotion}
+          currency={currency}
+          ratingSummary={{ total: reviewCount, average: averageRating ?? 0 }}
+          lowStockThreshold={settings.lowStockThreshold}
           product={{
             id: product.id,
             name: product.name,
@@ -259,6 +266,7 @@ export default async function ProductPage({ params }: Props) {
             })),
           }}
           details={{
+            summary: truncateMetaDescription(plainOverview, 200),
             description: compiledDescription,
             overview: compiledOverview,
             materials: compiledMaterials,

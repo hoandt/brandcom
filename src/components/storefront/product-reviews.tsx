@@ -7,6 +7,7 @@ import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useStorefrontHydration } from "./product-urgency";
 
 type Review = {
   id: string;
@@ -41,6 +42,7 @@ function Stars({ rating, interactive, onChange }: { rating: number; interactive?
 export function ProductReviews({ productId, productName }: { productId: string; productName: string }) {
   const t = useTranslations("Reviews");
   const locale = useLocale();
+  const hydrated = useStorefrontHydration();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState<"helpful" | "recent">("helpful");
@@ -91,11 +93,11 @@ export function ProductReviews({ productId, productName }: { productId: string; 
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["product-reviews", productId] }),
   });
 
-  const data = query.data;
+  const data = hydrated ? query.data : undefined;
   const summary = data?.summary;
 
   return (
-    <section className="w-full border-t border-border/70 px-4 py-12 sm:px-6 lg:px-8 lg:py-16" aria-labelledby="reviews-heading">
+    <section id="reviews" className="w-full scroll-mt-32 border-t border-border/70 px-4 py-12 sm:px-6 lg:px-8 lg:py-16" aria-labelledby="reviews-heading">
       <div className="mx-auto max-w-6xl">
         <div className="mb-8 flex flex-col justify-between gap-5 border-b border-border/70 pb-7 sm:flex-row sm:items-end">
           <div>
@@ -118,8 +120,8 @@ export function ProductReviews({ productId, productName }: { productId: string; 
           </form>
         )}
 
-        {query.isLoading && <div className="h-48 animate-pulse bg-muted/50" />}
-        {query.isError && <p className="py-8 text-sm text-destructive">{t("loadError")}</p>}
+        {(!hydrated || query.isLoading) && <div className="h-48 animate-pulse bg-muted/50" />}
+        {hydrated && query.isError && <p className="py-8 text-sm text-destructive">{t("loadError")}</p>}
 
         {data && (
           <div className="grid gap-10 lg:grid-cols-[280px_minmax(0,1fr)]">
@@ -141,7 +143,19 @@ export function ProductReviews({ productId, productName }: { productId: string; 
                   <option value="helpful">{t("mostHelpful")}</option><option value="recent">{t("mostRecent")}</option>
                 </select>
               </div>
-              {data.reviews.length === 0 ? <div className="border-y py-12 text-center text-sm text-muted-foreground">{t("empty")}</div> : data.reviews.map((review) => (
+              {data.reviews.length === 0 ? (
+                <div className="border-y border-[#eadfdb] bg-[#fdf9f7] px-5 py-12 text-center">
+                  <CheckCircle2 className="mx-auto size-6 text-[#7a1c37]" strokeWidth={1.6} />
+                  <p className="mt-3 text-sm font-semibold text-foreground">
+                    {locale === "vi" ? "Chưa có đánh giá đã xác minh" : t("empty")}
+                  </p>
+                  <p className="mx-auto mt-2 max-w-md text-xs leading-5 text-muted-foreground">
+                    {locale === "vi"
+                      ? "Auria chỉ công khai đánh giá thật sau khi kiểm duyệt. Nếu bạn đã sử dụng sản phẩm, hãy chia sẻ trải nghiệm để giúp người mua tiếp theo."
+                      : t("empty")}
+                  </p>
+                </div>
+              ) : data.reviews.map((review) => (
                 <article key={review.id} className="border-t border-border/70 py-6 first:border-t-0">
                   <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1"><Stars rating={review.rating} /><h3 className="font-semibold">{review.title}</h3></div>
                   <p className="text-xs text-muted-foreground">{review.authorName} · {new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(review.createdAt))}</p>
@@ -159,9 +173,15 @@ export function ProductReviews({ productId, productName }: { productId: string; 
   );
 }
 
-export function ProductRatingInline({ productId }: { productId: string }) {
+export function ProductRatingInline({ productId, emphasizeAuthenticity = false, sold, initialSummary }: {
+  productId: string;
+  emphasizeAuthenticity?: boolean;
+  sold?: number;
+  initialSummary?: { total: number; average: number };
+}) {
   const t = useTranslations("Reviews");
   const locale = useLocale();
+  const hydrated = useStorefrontHydration();
   const query = useQuery<ReviewsResponse>({
     queryKey: ["product-reviews", productId, 1, "helpful"],
     queryFn: async () => {
@@ -172,8 +192,35 @@ export function ProductRatingInline({ productId }: { productId: string }) {
     staleTime: 60_000,
     refetchOnWindowFocus: false,
   });
-  const summary = query.data?.summary;
-  if (query.isLoading) return <div className="h-4 w-44 animate-pulse bg-muted" aria-hidden="true" />;
-  if (!summary?.total) return <span className="text-xs text-muted-foreground">{locale === "vi" ? "Chưa có đánh giá" : locale === "th" ? "ยังไม่มีรีวิว" : "No reviews yet"}</span>;
-  return <div className="flex items-center gap-1.5"><Stars rating={Math.round(summary.average)} /><a href="#reviews-heading" className="text-xs text-muted-foreground hover:underline">{summary.average.toFixed(1)}/5 · {t("globalRatings", { count: summary.total })}</a></div>;
+  const summary = (hydrated ? query.data?.summary : undefined) ?? initialSummary;
+  if (emphasizeAuthenticity) {
+    if (!summary && query.isLoading) return <div className="h-4 w-44 animate-pulse bg-muted" aria-label="Đang tải đánh giá" />;
+    if (!summary?.total && !sold) return null;
+    return (
+      <a href="#reviews" onClick={(event) => {
+        const reviews = document.getElementById("reviews");
+        if (reviews && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+          event.preventDefault();
+          history.replaceState(history.state, "", "#reviews");
+          reviews.scrollIntoView({ behavior: "smooth" });
+        }
+      }} className="flex w-fit flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] font-semibold text-[#6b4a55] hover:text-[#7a1c37] hover:underline">
+        {!!summary?.total && (
+          <>
+            <span className="tracking-widest text-[#7a1c37]" aria-hidden="true">
+              {"★".repeat(Math.round(summary.average))}{"☆".repeat(5 - Math.round(summary.average))}
+            </span>
+            <span>{summary.average.toLocaleString("vi-VN", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}/5 ({summary.total.toLocaleString("vi-VN")} đánh giá)</span>
+          </>
+        )}
+        {!!sold && <span>{summary?.total ? "· " : ""}Đã bán {sold.toLocaleString("vi-VN")}</span>}
+      </a>
+    );
+  }
+  if (!hydrated || query.isLoading) return <div className="h-4 w-44 animate-pulse bg-muted" aria-hidden="true" />;
+  if (query.isError) return <a href="#reviews" className="text-xs text-muted-foreground hover:underline">{locale === "vi" ? "Xem đánh giá sản phẩm" : "View product reviews"}</a>;
+  if (!summary?.total) {
+    return <span className="text-xs text-muted-foreground">{locale === "vi" ? "Chưa có đánh giá" : locale === "th" ? "ยังไม่มีรีวิว" : "No reviews yet"}</span>;
+  }
+  return <div className="flex items-center gap-1.5"><Stars rating={Math.round(summary.average)} /><a href="#reviews" className="text-xs text-muted-foreground hover:underline">{summary.average.toFixed(1)}/5 · {t("globalRatings", { count: summary.total })}</a></div>;
 }

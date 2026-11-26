@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Edit, Plus, Trash } from "lucide-react"
 import { homepageMediaNames } from "@/lib/homepage-media"
+import { PRODUCT_PROMOTION_CODE, PRODUCT_PROMOTION_NAME } from "@/lib/product-promotion"
 
 type ComponentType = {
   id: string
@@ -53,6 +54,9 @@ export function ComponentsClient() {
       <div className="flex flex-wrap items-center gap-2">
         <Button render={<Link href={`${componentPath}/new`} />} className="h-9 rounded-none">
           <Plus className="size-4" /> Create Component
+        </Button>
+        <Button variant="outline" className="h-9 rounded-none" render={<Link href={`${componentPath}/${PRODUCT_PROMOTION_CODE}`} />}>
+          {PRODUCT_PROMOTION_NAME}
         </Button>
         {components && Object.entries(homepageMediaNames).map(([code, name]) => {
           const configured = components.some((component) => component.code === code)
@@ -122,7 +126,7 @@ export function ComponentsClient() {
                         render={<Link href={`${componentPath}/${encodeURIComponent(comp.code)}`} />}>
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button
+                      {comp.code !== PRODUCT_PROMOTION_CODE && <Button
                         variant="ghost"
                         size="icon"
                         aria-label={`Delete ${comp.name}`}
@@ -135,7 +139,7 @@ export function ComponentsClient() {
                         }}
                       >
                         <Trash className="h-4 w-4" />
-                      </Button>
+                      </Button>}
                     </div>
                   </td>
                 </tr>

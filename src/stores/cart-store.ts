@@ -18,12 +18,13 @@ type CartState = {
   addItem: (item: CartItem) => void;
   removeItem: (variantId: string) => void;
   updateQuantity: (variantId: string, quantity: number) => void;
+  replaceOne: (oldVariantId: string, replacement: CartItem, maxQuantity: number) => boolean;
   clearCart: () => void;
 };
 
 export const useCartStore = create<CartState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       items: [],
       addItem: (item) =>
         set((state) => {
@@ -51,6 +52,23 @@ export const useCartStore = create<CartState>()(
             i.variantId === variantId ? { ...i, quantity } : i
           ),
         })),
+      replaceOne: (oldVariantId, replacement, maxQuantity) => {
+        if (oldVariantId === replacement.variantId) return false;
+        const { items } = get();
+        const original = items.find((item) => item.variantId === oldVariantId);
+        const target = items.find((item) => item.variantId === replacement.variantId);
+        if (!original || original.quantity < 1 || (target?.quantity ?? 0) >= maxQuantity) return false;
+
+        const nextItems = items
+          .filter((item) => item.variantId !== oldVariantId || item.quantity > 1)
+          .map((item) => {
+            if (item.variantId === oldVariantId) return { ...item, quantity: item.quantity - 1 };
+            if (item.variantId === replacement.variantId) return { ...replacement, quantity: item.quantity + 1 };
+            return item;
+          });
+        set({ items: target ? nextItems : [...nextItems, { ...replacement, quantity: 1 }] });
+        return true;
+      },
       clearCart: () => set({ items: [] }),
     }),
     {

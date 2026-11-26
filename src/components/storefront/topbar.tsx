@@ -3,14 +3,22 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useLocale } from "next-intl"
+import { getVietnameseProductSlug } from "./product-urgency"
 
 interface TopbarProps {
-  data: any
+  data?: {
+    text?: string
+    href?: string
+    backgroundColor?: string
+    textColor?: string
+    speed?: number
+  } | null
 }
 
 export function Topbar({ data }: TopbarProps) {
   const pathname = usePathname()
   const locale = useLocale()
+  if (getVietnameseProductSlug(pathname)) return null
   if (!data || !data.text) return null
 
   if (pathname === `/${locale}` || pathname === "/") {

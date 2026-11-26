@@ -25,6 +25,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { HomepageMediaEditor } from "./homepage-media-editor"
+import { ProductPromotionEditor } from "./product-promotion-editor"
+import { PRODUCT_PROMOTION_CODE, PRODUCT_PROMOTION_NAME, defaultProductPromotion, validateProductPromotion } from "@/lib/product-promotion"
 
 type ComponentType = {
   id?: string
@@ -582,6 +584,10 @@ export function ComponentEditorScreen({ code, preset }: { code: string; preset?:
           // Keep legacy text available in the JSON editor.
         }
       }
+      if (code === PRODUCT_PROMOTION_CODE) {
+        const { content } = validateProductPromotion(data.content)
+        return { ...data, type: PRODUCT_PROMOTION_CODE, content: content ?? defaultProductPromotion }
+      }
       return data
     },
   })
@@ -631,6 +637,7 @@ function ComponentEditor({ initialData, preset }: { initialData: ComponentType |
 
   const [jsonError, setJsonError] = useState("")
   const isHomepageMedia = isHomepageMediaType(formData.type)
+  const isProductPromotion = formData.code === PRODUCT_PROMOTION_CODE && !isNew
 
   const uploadMutation = useMutation({
     mutationFn: async (file: File): Promise<string> => {
@@ -716,7 +723,7 @@ function ComponentEditor({ initialData, preset }: { initialData: ComponentType |
             <select
               id="type"
               value={formData.type}
-              disabled={!isNew && isHomepageMediaType(formData.code)}
+              disabled={isProductPromotion || (!isNew && isHomepageMediaType(formData.code))}
               onChange={(e) => {
                 const type = e.target.value
                 setJsonError("")
@@ -746,6 +753,7 @@ function ComponentEditor({ initialData, preset }: { initialData: ComponentType |
               <option value="theme-settings">Theme Settings</option>
               <option value="hero">Hero Banner</option>
               <option value="featured-products">Featured Products</option>
+              {isProductPromotion && <option value={PRODUCT_PROMOTION_CODE}>{PRODUCT_PROMOTION_NAME}</option>}
               {(isNew || isHomepageMediaType(formData.code)) && (
                 <>
                   <option value="logo-marquee">{homepageMediaNames["logo-marquee"]}</option>
@@ -771,7 +779,9 @@ function ComponentEditor({ initialData, preset }: { initialData: ComponentType |
         <div className="bg-card border p-6 space-y-4">
           <h2 className="text-lg font-bold">Component Content</h2>
 
-          {isHomepageMediaType(formData.type) ? (
+          {isProductPromotion ? (
+            <ProductPromotionEditor value={formData.content} onChange={(content) => setFormData({ ...formData, content })} />
+          ) : isHomepageMediaType(formData.type) ? (
             <HomepageMediaEditor
               type={formData.type}
               value={formData.content}

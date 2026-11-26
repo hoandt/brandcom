@@ -5,6 +5,12 @@ import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { invalidateDynamicComponentCache } from "@/lib/dynamic-components";
 import { revalidatePath } from "next/cache";
+import {
+  defaultProductPromotion,
+  PRODUCT_PROMOTION_CODE,
+  PRODUCT_PROMOTION_NAME,
+  validateProductPromotion,
+} from "@/lib/product-promotion";
 
 export async function GET(
   req: Request,
@@ -19,6 +25,16 @@ export async function GET(
     const component = await prisma.dynamicComponent.findUnique({
       where: { code },
     });
+
+    if (!component && code === PRODUCT_PROMOTION_CODE) {
+      return NextResponse.json({
+        code,
+        type: code,
+        name: PRODUCT_PROMOTION_NAME,
+        content: defaultProductPromotion,
+        isActive: true,
+      });
+    }
 
     if (!component) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -50,6 +66,35 @@ export async function PATCH(
         (type !== undefined && (typeof type !== "string" || !type)) ||
         (isActive !== undefined && typeof isActive !== "boolean")) {
       return NextResponse.json({ error: "Invalid component fields" }, { status: 400 });
+    }
+
+    if (code === PRODUCT_PROMOTION_CODE) {
+      const result = validateProductPromotion(content === undefined ? defaultProductPromotion : content);
+      if (!result.content || (type !== undefined && type !== code)) {
+        return NextResponse.json({ error: result.error ?? "Invalid promotion component type." }, { status: 400 });
+      }
+      const component = await prisma.dynamicComponent.upsert({
+        where: { code },
+        create: {
+          code,
+          type: code,
+          name: name ?? PRODUCT_PROMOTION_NAME,
+          content: result.content,
+          isActive: isActive ?? true,
+        },
+        update: {
+          type: code,
+          ...(content !== undefined && { content: result.content }),
+          ...(name !== undefined && { name }),
+          ...(isActive !== undefined && { isActive }),
+        },
+      });
+      revalidatePath("/[locale]/products/[slug]", "page");
+      return NextResponse.json(component);
+    }
+
+    if (type === PRODUCT_PROMOTION_CODE) {
+      return NextResponse.json({ error: "Use the Product Page Promotions component." }, { status: 400 });
     }
 
     let savedContent = content;
@@ -94,6 +139,9 @@ export async function DELETE(
 
   try {
     const { code } = await params;
+    if (code === PRODUCT_PROMOTION_CODE) {
+      return NextResponse.json({ error: "Deactivate Product Page Promotions from its editor." }, { status: 405 });
+    }
     await prisma.dynamicComponent.delete({
       where: { code },
     });
