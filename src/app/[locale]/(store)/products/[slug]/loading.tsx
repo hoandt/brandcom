@@ -1,31 +1,25 @@
-import { Loader2 } from "lucide-react";
+import palette from "@/components/storefront/product-palette.module.css";
 
 export default function Loading() {
   return (
-    <div className="container mx-auto px-4 pt-12 pb-40 max-w-7xl">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-12 lg:gap-24">
-        {/* Skeleton for Images */}
-        <div className="flex flex-col space-y-4">
-          <div className="relative aspect-[3/4] w-full bg-secondary/50 animate-pulse rounded-md" />
-          <div className="grid grid-cols-4 gap-4">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="relative aspect-[3/4] w-full bg-secondary/50 animate-pulse rounded-md" />
+    <div className={`${palette.productContainer} pt-3 pb-24 lg:pt-7`} aria-hidden="true">
+      <div className={palette.productGrid}>
+        <div className="grid gap-3 lg:grid-cols-[3.5rem_minmax(0,1fr)]">
+          <div className="hidden gap-2 self-start lg:grid">
+            {Array.from({ length: 5 }, (_, index) => (
+              <div key={index} className="size-14 animate-pulse rounded-sm bg-muted" />
             ))}
           </div>
+          <div className="aspect-[4/5] w-full animate-pulse rounded-[1rem] bg-muted" />
         </div>
 
-        {/* Skeleton for Product Info */}
-        <div className="flex flex-col space-y-8 pt-4">
-          <div className="space-y-4">
-            <div className="h-10 w-3/4 bg-secondary/50 animate-pulse rounded-md" />
-            <div className="h-6 w-1/4 bg-secondary/50 animate-pulse rounded-md" />
-          </div>
-          <div className="space-y-2">
-            <div className="h-4 w-full bg-secondary/50 animate-pulse rounded-md" />
-            <div className="h-4 w-full bg-secondary/50 animate-pulse rounded-md" />
-            <div className="h-4 w-2/3 bg-secondary/50 animate-pulse rounded-md" />
-          </div>
-          <div className="h-14 w-full bg-secondary/50 animate-pulse rounded-full mt-8" />
+        <div className="grid gap-3 lg:pt-1">
+          <div className="h-9 w-4/5 animate-pulse rounded-sm bg-muted" />
+          <div className="mb-3 h-7 w-1/3 animate-pulse rounded-sm bg-muted" />
+          {Array.from({ length: 3 }, (_, index) => (
+            <div key={index} className="h-14 animate-pulse rounded-sm bg-muted" />
+          ))}
+          <div className="h-12 animate-pulse rounded-full bg-muted" />
         </div>
       </div>
     </div>

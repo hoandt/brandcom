@@ -5,8 +5,7 @@ import { isAdminEmail } from "@/lib/admin-access";
 import { invalidateStorefrontCache } from "@/lib/storefront-cache";
 import { invalidateStoreSettingsCache } from "@/lib/store-settings";
 import { invalidateDynamicComponentCache } from "@/lib/dynamic-components";
-import { invalidateProductsListCache } from "../../products/route";
-import { invalidateAdminProductCache } from "../../products/[productId]/route";
+import { invalidateAdminProductCache, invalidateProductsListCache } from "@/lib/admin-catalog-cache";
 
 export async function POST() {
   const session = await auth();

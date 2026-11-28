@@ -1,0 +1,60 @@
+.theme {
+  --pdp-paper: #fff;
+  --pdp-stone: #f5f5f7;
+  --pdp-line: #e5e5e7;
+  --pdp-ink: #1d1d1f;
+  --pdp-muted: #6e6e73;
+  --pdp-wine: var(--primary);
+  --background: var(--pdp-paper);
+  --foreground: var(--pdp-ink);
+  --heading-color: var(--pdp-ink);
+  --muted: var(--pdp-stone);
+  --muted-foreground: var(--pdp-muted);
+  --accent: var(--pdp-stone);
+  --border: var(--pdp-line);
+  --font-sans: system-ui, sans-serif;
+  --font-heading: var(--font-sans);
+  font-family: var(--font-sans);
+}
+
+.productContainer {
+  width: 100%;
+  max-width: 64rem;
+  margin-inline: auto;
+  padding-inline: 1rem;
+}
+
+.productGrid {
+  display: grid;
+  align-items: start;
+  gap: 0.75rem;
+}
+
+@media (min-width: 40rem) {
+  .productContainer {
+    padding-inline: 1.5rem;
+  }
+}
+
+@media (min-width: 64rem) {
+  .productContainer {
+    padding-inline: 2rem;
+  }
+
+  .productGrid {
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+    column-gap: 2.5rem;
+  }
+}
+
+.quiet {
+  --pdp-stone: #f5f5f4;
+  --pdp-line: #e5e5e5;
+  --pdp-muted: #737373;
+  --pdp-wine: #7a1331;
+  --pdp-wine-hover: #5e0e25;
+  --pdp-bundle-tint: #faf6f4;
+  --primary: var(--pdp-wine);
+  --primary-foreground: white;
+  --font-heading: var(--font-heading-fallback, Georgia), serif;
+}

@@ -19,13 +19,21 @@ async function loadFlashVoucher(code: string | undefined, productId: string, now
     where: { tenantId_code: { tenantId: DEFAULT_TENANT_ID, code: code.toUpperCase() } },
     select: {
       code: true, name: true, status: true, startsAt: true, endsAt: true, productIds: true,
-      totalUsageLimit: true, consumedQuantity: true,
+      minimumCartSubtotal: true, totalUsageLimit: true, consumedQuantity: true,
+      benefit: true,
     },
   });
   if (!voucher || voucher.status !== "active" || voucher.startsAt > now || voucher.endsAt <= now) return null;
   if (voucher.productIds.length && !voucher.productIds.includes(productId)) return null;
   if (voucher.totalUsageLimit !== null && voucher.consumedQuantity >= voucher.totalUsageLimit) return null;
-  return { code: voucher.code, name: voucher.name, endsAt: voucher.endsAt.toISOString() };
+  const benefit = voucher.benefit as { scope?: string; type?: string } | null;
+  return {
+    code: voucher.code,
+    name: voucher.name,
+    endsAt: voucher.endsAt.toISOString(),
+    minimumCartSubtotal: voucher.minimumCartSubtotal,
+    isFreeShipping: benefit?.scope === "shipping" && benefit.type === "free_shipping",
+  };
 }
 
 export async function GET(_request: Request, { params }: Context) {
@@ -34,13 +42,14 @@ export async function GET(_request: Request, { params }: Context) {
     const [product, promotion] = await Promise.all([
       prisma.product.findUnique({
         where: { slug, status: "ACTIVE" },
-        select: { id: true, variants: { select: { id: true, stock: true, isActive: true } } },
+        select: { id: true, variants: { select: { id: true, stock: true, price: true, isActive: true } } },
       }),
       getProductPromotion(slug),
     ]);
     if (!product) return NextResponse.json({ error: "Sản phẩm không tồn tại" }, { status: 404 });
-    const stock = Object.fromEntries(product.variants.filter((variant) => variant.isActive).map((variant) => [variant.id, variant.stock]));
-    if (!promotion?.enabled) return NextResponse.json({ stock, sold: 0, recent: null, campaign: null }, { headers: noStoreHeaders });
+    const activeVariants = product.variants.filter((variant) => variant.isActive);
+    const stock = Object.fromEntries(activeVariants.map((variant) => [variant.id, variant.stock]));
+    const prices = Object.fromEntries(activeVariants.map((variant) => [variant.id, Number(variant.price)]));
 
     const now = new Date();
     const variantIds = product.variants.map((variant) => variant.id);
@@ -49,7 +58,7 @@ export async function GET(_request: Request, { params }: Context) {
         where: { variantId: { in: variantIds }, order: { orderStatus: { in: ["DELIVERED", "COMPLETED"] } } },
         _sum: { quantity: true },
       })),
-      promotion.purchaseToast === false ? null : storefrontCache(`product-recent-purchases:${product.id}`, 15, () => prisma.order.aggregate({
+      !promotion?.enabled || promotion.purchaseToast === false ? null : storefrontCache(`product-recent-purchases:${product.id}`, 15, () => prisma.order.aggregate({
         where: {
           items: { some: { variantId: { in: variantIds } } },
           orderStatus: { in: ["PROCESSING", "SHIPPED", "DELIVERED", "COMPLETED"] },
@@ -58,16 +67,17 @@ export async function GET(_request: Request, { params }: Context) {
         _count: { _all: true },
         _max: { createdAt: true },
       })),
-      loadFlashVoucher(promotion.flashVoucherCode, product.id, now),
+      promotion?.enabled ? loadFlashVoucher(promotion.flashVoucherCode, product.id, now) : null,
     ]);
     return NextResponse.json({
       stock,
+      prices,
       sold: sales._sum.quantity ?? 0,
       recent: recent?._max.createdAt && now.getTime() - recent._max.createdAt.getTime() < recentWindowMs
         ? { count: recent._count._all, latestMinute: Math.floor(recent._max.createdAt.getTime() / 60_000) } : null,
       campaign,
-      announcement: promotion.announcement,
-      expressShipping: promotion.expressShipping,
+      announcement: promotion?.enabled ? promotion.announcement : undefined,
+      expressShipping: promotion?.enabled ? promotion.expressShipping : undefined,
     }, { headers: noStoreHeaders });
   } catch (error) {
     console.error("[PRODUCT_ACTIVITY_ERROR]", error);

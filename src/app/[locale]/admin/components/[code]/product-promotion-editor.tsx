@@ -11,15 +11,14 @@ const toggleFields = [
   ["enabled", "Promotion layout"],
   ["stickyBar", "Sticky purchase bar"],
   ["cartDrawer", "Cart confirmation drawer"],
-  ["bundleUpgrade", "Bundle savings and upgrade prompts"],
-  ["liveViewers", "Live viewer count"],
-  ["purchaseToast", "Recent purchase toast"],
+  ["bundleUpgrade", "Offer bundle upgrades in the cart drawer"],
 ] as const;
 
 const copyFields = [
-  ["announcement", "Announcement", 180],
   ["intro", "Product introduction", 500],
   ["returnPolicy", "Return policy", 1000],
+  ["threePairIncludedGift", "Gift already packed with the 3-pair SKU", 120],
+  ["flashVoucherCode", "Voucher code for the offer countdown", 80],
 ] as const;
 
 const selectClass = "h-10 w-full border bg-background px-3 text-sm";
@@ -71,27 +70,16 @@ function PromotionFields({ settings, onChange, override = false }: {
             </select>
           )}
         </Field>
-        <Field label="Low-stock threshold (0 hides the count)">
+        <Field label="Lead gallery photo (1 is the first catalog photo)">
           {(id) => (
-            <Input id={id} type="number" min={0} max={100} value={settings.lowStockThreshold ?? ""} placeholder={inheritedLabel}
-              onChange={(event) => update("lowStockThreshold", event.target.value === "" ? undefined : event.target.valueAsNumber)} />
+            <Input id={id} type="number" min={1} max={50} value={settings.galleryLeadImage ?? ""} placeholder={inheritedLabel}
+              onChange={(event) => update("galleryLeadImage", event.target.value === "" ? undefined : event.target.valueAsNumber)} />
           )}
         </Field>
-        <Field label="Flash-sale voucher code">
-          {(id) => (
-            <Input id={id} maxLength={80} value={settings.flashVoucherCode ?? ""}
-              placeholder={override ? "Inherit shared voucher" : "Code from Admin → Discounts"}
-              onChange={(event) => update("flashVoucherCode", event.target.value)} />
-          )}
-        </Field>
-        {override && <div className="flex flex-wrap items-end gap-4 text-xs">
-          <button type="button" className="underline" onClick={() => update("flashVoucherCode", undefined)}>Inherit voucher</button>
-          <button type="button" className="underline" onClick={() => update("flashVoucherCode", "")}>Hide countdown</button>
-        </div>}
       </div>
 
       <div className="space-y-3 border-l-2 pl-4">
-        <Field label="Express delivery countdown">
+        <Field label="Express delivery availability">
           {(id) => (
             <select id={id} className={selectClass} value={settings.expressShipping ? "custom" : settings.expressShipping === null ? "off" : ""}
               onChange={(event) => update("expressShipping", event.target.value === "custom"
@@ -140,30 +128,13 @@ function PromotionFields({ settings, onChange, override = false }: {
           <Field key={key} label={label}>
             {(id) => (
               <>
-                <Textarea id={id} rows={key === "announcement" ? 2 : 3} maxLength={limit}
+                <Textarea id={id} rows={3} maxLength={limit}
                   value={settings[key] ?? ""} placeholder={override && settings[key] === undefined ? inheritedLabel : undefined}
                   onChange={(event) => update(key, event.target.value)} />
                 {override && (
                   <div className="flex gap-4 text-xs">
                     <button type="button" className="underline" onClick={() => update(key, undefined)}>Inherit</button>
                     <button type="button" className="underline" onClick={() => update(key, "")}>Hide</button>
-                  </div>
-                )}
-              </>
-            )}
-          </Field>
-        ))}
-        {(["benefits", "trustLabels"] as const).map((key) => (
-          <Field key={key} label={key === "benefits" ? "Benefit labels (up to six, one per line)" : "Trust labels (up to three, one per line)"}>
-            {(id) => (
-              <>
-                <Textarea id={id} rows={3} value={settings[key]?.join("\n") ?? ""}
-                  placeholder={override && settings[key] === undefined ? inheritedLabel : undefined}
-                  onChange={(event) => update(key, event.target.value.split("\n"))} />
-                {override && (
-                  <div className="flex gap-4 text-xs">
-                    <button type="button" className="underline" onClick={() => update(key, undefined)}>Inherit</button>
-                    <button type="button" className="underline" onClick={() => update(key, [])}>Hide</button>
                   </div>
                 )}
               </>

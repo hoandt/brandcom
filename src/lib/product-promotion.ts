@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { AURIA_THERMAL_PRODUCT_SLUG } from "@/lib/auria-product-offers";
 
 export const PRODUCT_PROMOTION_CODE = "product-promotion";
 export const PRODUCT_PROMOTION_NAME = "Product Page Promotions";
@@ -11,8 +12,11 @@ const settingsSchema = z.object({
   cartDrawer: z.boolean().optional(),
   bundleUpgrade: z.boolean().optional(),
   defaultVariant: z.enum(["first", "best-value"]).optional(),
+  galleryLeadImage: z.number().int().min(1).max(50).optional(),
+  // Existing saved components may include this legacy field.
   lowStockThreshold: z.number().int().min(0).max(100).optional(),
   announcement: text(180).optional(),
+  purchaseCue: text(180).optional(),
   flashVoucherCode: text(80).optional(),
   expressShipping: z.object({
     cutoff: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Enter a cutoff time in HH:mm format."),
@@ -25,6 +29,7 @@ const settingsSchema = z.object({
   benefits: z.array(text(80)).transform((lines) => lines.filter(Boolean)).pipe(z.array(z.string()).max(6)).optional(),
   trustLabels: z.array(text(80)).transform((lines) => lines.filter(Boolean)).pipe(z.array(z.string()).max(3)).optional(),
   returnPolicy: text(1000).optional(),
+  threePairIncludedGift: text(120).optional(),
   comparison: z.object({
     title: line(150),
     rows: z.array(z.object({
@@ -63,6 +68,8 @@ export type ProductPromotion = PromotionSettings & {
   defaultVariant: "first" | "best-value";
 };
 
+const sevenDayReturnPolicy = "Hỗ trợ đổi trả trong 7 ngày với sản phẩm lỗi, giao sai hoặc thiếu hàng. Sản phẩm cần còn nguyên vẹn và chưa qua sử dụng.";
+
 export const defaultProductPromotion: ProductPromotionConfig = {
   defaults: {
     enabled: true,
@@ -70,18 +77,14 @@ export const defaultProductPromotion: ProductPromotionConfig = {
     cartDrawer: true,
     bundleUpgrade: true,
     defaultVariant: "first",
-    trustLabels: ["Hỗ trợ sau mua"],
   },
   products: [{
     slug: "mieng-dan-nhu-hoa-tron",
     settings: {
-      defaultVariant: "best-value",
-      lowStockThreshold: 10,
-      announcement: "So sánh giá từng combo miếng dán tròn",
+      defaultVariant: "first",
+      galleryLeadImage: 1,
       intro: "Mỏng nhẹ dưới áo ôm, bám chắc khi vận động và êm dịu trên da.",
-      benefits: ["Viền siêu mỏng", "100% silicone", "Kháng nước & mồ hôi"],
-      trustLabels: ["Keo sinh học", "Đổi lỗi 7 ngày", "Hỗ trợ sau mua"],
-      returnPolicy: "Hỗ trợ đổi trả trong 7 ngày với sản phẩm lỗi, giao sai hoặc thiếu hàng. Sản phẩm cần còn nguyên vẹn và chưa qua sử dụng.\nVui lòng quay video mở hàng có mã vận đơn để Auria hỗ trợ nhanh nhất.",
+      returnPolicy: `${sevenDayReturnPolicy}\nVui lòng quay video mở hàng có mã vận đơn để Auria hỗ trợ nhanh nhất.`,
       comparison: {
         title: "Chọn miếng dán phù hợp với trang phục của bạn",
         rows: [
@@ -91,6 +94,18 @@ export const defaultProductPromotion: ProductPromotionConfig = {
           { label: "Dùng lại", auria: "Có thể tái sử dụng khi vệ sinh đúng cách", alternative: "Xem hướng dẫn vệ sinh và tái sử dụng của từng mẫu." },
         ],
       },
+    },
+  }, {
+    slug: "mieng-dan-nhu-hoa-thong-hoi-loc-xoay",
+    settings: {
+      galleryLeadImage: 5,
+      intro: "Silicone siêu mỏng với lỗ thoáng khí.",
+      returnPolicy: sevenDayReturnPolicy,
+    },
+  }, {
+    slug: AURIA_THERMAL_PRODUCT_SLUG,
+    settings: {
+      returnPolicy: sevenDayReturnPolicy,
     },
   }],
 };

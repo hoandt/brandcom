@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button"
 import { useTranslations, useLocale } from "next-intl"
 import { LanguageSwitcher } from "./language-switcher"
 import { CartIcon } from "./cart-icon"
-import { getVietnameseProductSlug, ProductCampaignBar } from "./product-urgency"
+import { isProductDetailsPath } from "./product-urgency"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -65,20 +65,18 @@ export function Navbar({ session, dynamicMenu, logoUrl }: { session: Session | n
     }
   }, [isMobileMenuOpen])
 
-  const isHomepage = pathname === `/${locale}` || pathname === "/"
-  const productSlug = getVietnameseProductSlug(pathname)
+  const usesHomepageHeader = pathname === `/${locale}` || pathname === "/" || isProductDetailsPath(pathname)
   const isShopActive = ["/collections/", "/categories/", "/products/"].some((segment) => pathname.includes(segment)) || isCategoryOpen
   const navigationLinkClass = "border-b-2 border-transparent py-3 font-sans text-sm font-medium text-muted-foreground transition-colors hover:border-current hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2"
 
   return (
     <header
-      className={`z-50 w-full border-b border-border/50 transition-all duration-300 ${isHomepage
-        ? "relative bg-white"
-        : "sticky top-0 bg-background/70 backdrop-blur-xl shadow-sm"
+      className={`z-50 w-full border-b transition-all duration-300 ${usesHomepageHeader
+        ? "relative border-border/50 bg-white"
+        : "sticky top-0 border-border/50 bg-background/70 backdrop-blur-xl shadow-sm"
         }`}
     >
-      {productSlug && <ProductCampaignBar key={productSlug} slug={productSlug} />}
-      <div className={`storefront-container flex h-[4.5rem] min-w-0 items-center justify-between gap-2 text-foreground transition-colors duration-300 lg:h-20 ${productSlug ? "max-sm:[@media(max-height:700px)]:h-14" : ""}`}>
+      <div className="storefront-container flex h-[4.5rem] min-w-0 items-center justify-between gap-2 text-foreground transition-colors duration-300 lg:h-20">
 
         {/* Left Section: Logo & Desktop Links */}
         <div className="flex h-full min-w-0 shrink items-center gap-6 xl:gap-10">

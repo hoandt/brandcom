@@ -7,6 +7,7 @@ import { slugify } from "@/lib/slugify";
 import { revalidateTag } from "next/cache";
 import { z } from "zod";
 import { invalidateStorefrontCache } from "@/lib/storefront-cache";
+import { adminProductsListCache, invalidateProductsListCache } from "@/lib/admin-catalog-cache";
 
 async function authorized() {
   const session = await auth();
@@ -30,18 +31,14 @@ type SubmittedVariant = {
   imageUrl?: string | null;
 };
 
-let productsListCache: { data: any; timestamp: number } | null = null;
 const CACHE_TTL_MS = 30_000;
-
-export function invalidateProductsListCache() {
-  productsListCache = null;
-}
 
 export async function GET() {
   if (!(await authorized())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  if (productsListCache && Date.now() - productsListCache.timestamp < CACHE_TTL_MS) {
-    return NextResponse.json(productsListCache.data);
+  const cached = adminProductsListCache.entry;
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    return NextResponse.json(cached.data);
   }
 
   const products = await prisma.product.findMany({
@@ -66,7 +63,7 @@ export async function GET() {
     orderBy: { createdAt: "desc" },
   });
   const data = { products };
-  productsListCache = { data, timestamp: Date.now() };
+  adminProductsListCache.entry = { data, timestamp: Date.now() };
   return NextResponse.json(data);
 }
 

@@ -21,25 +21,35 @@ type Review = {
   createdAt: string;
 };
 
-type ReviewsResponse = {
+export type ReviewsResponse = {
   reviews: Review[];
   summary: { total: number; average: number; distribution: Record<number, number> };
   pagination: { page: number; pageCount: number };
 };
 
 function Stars({ rating, interactive, onChange }: { rating: number; interactive?: boolean; onChange?: (rating: number) => void }) {
+  const t = useTranslations("Reviews");
   return (
-    <div className="flex gap-0.5" aria-label={`${rating} out of 5 stars`}>
+    <div className="flex gap-0.5" role={interactive ? "group" : "img"} aria-label={t("starRating", { rating })}>
       {[1, 2, 3, 4, 5].map((star) => (
-        <button key={star} type="button" disabled={!interactive} onClick={() => onChange?.(star)} className={interactive ? "cursor-pointer" : "cursor-default"}>
-          <Star className={`h-4 w-4 ${star <= rating ? "fill-primary text-primary" : "fill-transparent text-border"}`} />
-        </button>
+        interactive ? (
+          <button key={star} type="button" onClick={() => onChange?.(star)} aria-label={t("starRating", { rating: star })}
+            className="cursor-pointer">
+            <Star aria-hidden="true" className={`h-4 w-4 ${star <= rating ? "fill-foreground text-foreground" : "fill-transparent text-border"}`} />
+          </button>
+        ) : (
+          <Star key={star} aria-hidden="true" className={`h-4 w-4 ${star <= rating ? "fill-foreground text-foreground" : "fill-transparent text-border"}`} />
+        )
       ))}
     </div>
   );
 }
 
-export function ProductReviews({ productId, productName }: { productId: string; productName: string }) {
+export function ProductReviews({ productId, productName, preview }: {
+  productId: string;
+  productName: string;
+  preview?: ReviewsResponse;
+}) {
   const t = useTranslations("Reviews");
   const locale = useLocale();
   const hydrated = useStorefrontHydration();
@@ -93,23 +103,31 @@ export function ProductReviews({ productId, productName }: { productId: string; 
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["product-reviews", productId] }),
   });
 
-  const data = hydrated ? query.data : undefined;
+  const liveData = hydrated ? query.data : undefined;
+  const sampleData = query.isSuccess && liveData?.summary.total === 0 ? preview : undefined;
+  const data = sampleData ?? liveData;
   const summary = data?.summary;
+  const reviewDate = new Intl.DateTimeFormat(locale, {
+    dateStyle: "medium",
+    timeZone: sampleData ? "Asia/Ho_Chi_Minh" : undefined,
+  });
 
   return (
     <section id="reviews" className="w-full scroll-mt-32 border-t border-border/70 px-4 py-12 sm:px-6 lg:px-8 lg:py-16" aria-labelledby="reviews-heading">
       <div className="mx-auto max-w-6xl">
         <div className="mb-8 flex flex-col justify-between gap-5 border-b border-border/70 pb-7 sm:flex-row sm:items-end">
           <div>
-            <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-primary">{t("eyebrow")}</p>
             <h2 id="reviews-heading" className="font-heading text-3xl font-medium text-foreground/85 sm:text-4xl">{t("title")}</h2>
+            {sampleData && <p className="mt-2 text-sm text-muted-foreground">{t("previewLabel")}</p>}
           </div>
-          <Button onClick={() => setShowForm((value) => !value)} variant="outline" className="rounded-none border-primary/40 text-primary hover:bg-primary hover:text-primary-foreground">
-            {showForm ? t("cancel") : t("writeReview")}
-          </Button>
+          {!sampleData && (
+            <Button onClick={() => setShowForm((value) => !value)} variant="outline" className="rounded-[12px] border-border text-foreground hover:bg-muted hover:text-foreground">
+              {showForm ? t("cancel") : t("writeReview")}
+            </Button>
+          )}
         </div>
 
-        {showForm && (
+        {!sampleData && showForm && (
           <form className="mb-10 max-w-2xl space-y-4 border border-border bg-card p-5 shadow-sm" onSubmit={(event) => { event.preventDefault(); setFormError(""); submitMutation.mutate(); }}>
             <div><p className="mb-2 text-sm font-semibold">{t("rate", { productName })}</p><Stars rating={rating} interactive onChange={setRating} /></div>
             <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={t("headlinePlaceholder")} minLength={3} maxLength={100} required className="rounded-none" />
@@ -120,48 +138,49 @@ export function ProductReviews({ productId, productName }: { productId: string; 
           </form>
         )}
 
-        {(!hydrated || query.isLoading) && <div className="h-48 animate-pulse bg-muted/50" />}
-        {hydrated && query.isError && <p className="py-8 text-sm text-destructive">{t("loadError")}</p>}
+        {!sampleData && (!hydrated || query.isLoading) && <div className="h-48 animate-pulse bg-muted/50" />}
+        {!sampleData && hydrated && query.isError && <p className="py-8 text-sm text-destructive">{t("loadError")}</p>}
 
         {data && (
           <div className="grid gap-10 lg:grid-cols-[280px_minmax(0,1fr)]">
             <aside>
-              <div className="flex items-end gap-2"><span className="text-5xl font-semibold text-primary">{summary?.average.toFixed(1)}</span><span className="pb-1 text-sm text-muted-foreground">/ 5</span></div>
+              <div className="flex items-end gap-2"><span className="text-5xl font-semibold text-foreground">{summary?.average.toLocaleString(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</span><span className="pb-1 text-sm text-muted-foreground">/ 5</span></div>
               <div className="my-3 flex items-center gap-2"><Stars rating={Math.round(summary?.average || 0)} /><span className="text-sm text-muted-foreground">{t("globalRatings", { count: summary?.total || 0 })}</span></div>
               <div className="mt-5 space-y-2">
                 {[5, 4, 3, 2, 1].map((star) => {
                   const count = summary?.distribution[star] || 0;
                   const percentage = summary?.total ? Math.round((count / summary.total) * 100) : 0;
-                  return <div key={star} className="grid grid-cols-[34px_1fr_36px] items-center gap-2 text-xs"><span>{star} ★</span><div className="h-2 overflow-hidden bg-muted"><div className="h-full bg-primary" style={{ width: `${percentage}%` }} /></div><span className="text-right text-muted-foreground">{percentage}%</span></div>;
+                  return <div key={star} className="grid grid-cols-[34px_1fr_36px] items-center gap-2 text-xs"><span>{star} ★</span><div className="h-2 overflow-hidden bg-muted"><div className="h-full bg-foreground" style={{ width: `${percentage}%` }} /></div><span className="text-right text-muted-foreground">{percentage}%</span></div>;
                 })}
               </div>
             </aside>
 
             <div>
-              <div className="mb-2 flex justify-end">
-                <select value={sort} onChange={(event) => { setSort(event.target.value as "helpful" | "recent"); setPage(1); }} className="border bg-background px-3 py-2 text-xs font-medium outline-none">
-                  <option value="helpful">{t("mostHelpful")}</option><option value="recent">{t("mostRecent")}</option>
-                </select>
-              </div>
+              {!sampleData && (
+                <div className="mb-2 flex justify-end">
+                  <select value={sort} onChange={(event) => { setSort(event.target.value as "helpful" | "recent"); setPage(1); }} className="border bg-background px-3 py-2 text-xs font-medium outline-none">
+                    <option value="helpful">{t("mostHelpful")}</option><option value="recent">{t("mostRecent")}</option>
+                  </select>
+                </div>
+              )}
               {data.reviews.length === 0 ? (
-                <div className="border-y border-[#eadfdb] bg-[#fdf9f7] px-5 py-12 text-center">
-                  <CheckCircle2 className="mx-auto size-6 text-[#7a1c37]" strokeWidth={1.6} />
+                <div className="rounded-[12px] bg-muted px-5 py-12 text-center">
                   <p className="mt-3 text-sm font-semibold text-foreground">
                     {locale === "vi" ? "Chưa có đánh giá đã xác minh" : t("empty")}
                   </p>
                   <p className="mx-auto mt-2 max-w-md text-xs leading-5 text-muted-foreground">
-                    {locale === "vi"
-                      ? "Auria chỉ công khai đánh giá thật sau khi kiểm duyệt. Nếu bạn đã sử dụng sản phẩm, hãy chia sẻ trải nghiệm để giúp người mua tiếp theo."
-                      : t("empty")}
+                    {locale === "vi" && "Chia sẻ trải nghiệm nếu bạn đã sử dụng sản phẩm."}
                   </p>
                 </div>
               ) : data.reviews.map((review) => (
                 <article key={review.id} className="border-t border-border/70 py-6 first:border-t-0">
                   <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1"><Stars rating={review.rating} /><h3 className="font-semibold">{review.title}</h3></div>
-                  <p className="text-xs text-muted-foreground">{review.authorName} · {new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(review.createdAt))}</p>
-                  {review.isVerifiedPurchase && <p className="mt-2 flex items-center gap-1 text-xs font-semibold text-primary"><CheckCircle2 className="h-3.5 w-3.5" />{t("verifiedPurchase")}</p>}
+                  <p className="text-xs text-muted-foreground">{review.authorName} · {reviewDate.format(new Date(review.createdAt))}</p>
+                  {review.isVerifiedPurchase && <p className="mt-2 flex items-center gap-1 text-xs font-semibold text-muted-foreground"><CheckCircle2 className="h-3.5 w-3.5" />{t("verifiedPurchase")}</p>}
                   <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-foreground/80">{review.body}</p>
-                  <button onClick={() => helpfulMutation.mutate(review.id)} className={`mt-4 flex items-center gap-1.5 border px-3 py-1.5 text-xs transition-colors ${review.viewerFoundHelpful ? "border-primary/30 bg-primary/5 text-primary" : "hover:border-primary/30 hover:text-primary"}`}><ThumbsUp className="h-3.5 w-3.5" />{t("helpful")} {review.helpfulCount > 0 && `(${review.helpfulCount})`}</button>
+                  {!sampleData && (
+                    <button onClick={() => helpfulMutation.mutate(review.id)} className={`mt-4 flex items-center gap-1.5 border px-3 py-1.5 text-xs transition-colors ${review.viewerFoundHelpful ? "border-primary/30 bg-primary/5 text-primary" : "hover:border-primary/30 hover:text-primary"}`}><ThumbsUp className="h-3.5 w-3.5" />{t("helpful")} {review.helpfulCount > 0 && `(${review.helpfulCount})`}</button>
+                  )}
                 </article>
               ))}
               {data.pagination.pageCount > 1 && <div className="mt-5 flex items-center justify-end gap-3"><Button variant="outline" disabled={page === 1} onClick={() => setPage((value) => value - 1)} className="rounded-none">{t("previous")}</Button><span className="text-xs text-muted-foreground">{page} / {data.pagination.pageCount}</span><Button variant="outline" disabled={page === data.pagination.pageCount} onClick={() => setPage((value) => value + 1)} className="rounded-none">{t("next")}</Button></div>}
@@ -173,13 +192,17 @@ export function ProductReviews({ productId, productName }: { productId: string; 
   );
 }
 
-export function ProductRatingInline({ productId, emphasizeAuthenticity = false, sold, initialSummary }: {
+export function ProductRatingInline({ productId, emphasizeAuthenticity = false, compact = false, sold, initialSummary, preview, previewSold }: {
   productId: string;
   emphasizeAuthenticity?: boolean;
+  compact?: boolean;
   sold?: number;
   initialSummary?: { total: number; average: number };
+  preview?: ReviewsResponse["summary"];
+  previewSold?: number;
 }) {
   const t = useTranslations("Reviews");
+  const tOffer = useTranslations("ProductOffer");
   const locale = useLocale();
   const hydrated = useStorefrontHydration();
   const query = useQuery<ReviewsResponse>({
@@ -192,10 +215,16 @@ export function ProductRatingInline({ productId, emphasizeAuthenticity = false, 
     staleTime: 60_000,
     refetchOnWindowFocus: false,
   });
-  const summary = (hydrated ? query.data?.summary : undefined) ?? initialSummary;
+  const liveSummary = (hydrated ? query.data?.summary : undefined) ?? initialSummary;
+  const sampleSummary = hydrated && query.isSuccess && query.data.summary.total === 0 ? preview : undefined;
+  const summary = sampleSummary ?? liveSummary;
+  const displayedSales = sold || previewSold;
+  const sampleLabel = <span className="rounded-full bg-muted px-1.5 py-0.5">{t("previewLabel")}</span>;
   if (emphasizeAuthenticity) {
     if (!summary && query.isLoading) return <div className="h-4 w-44 animate-pulse bg-muted" aria-label="Đang tải đánh giá" />;
-    if (!summary?.total && !sold) return null;
+    if (!summary?.total && !displayedSales) return null;
+    const compactNumber = new Intl.NumberFormat(locale, { notation: "compact", maximumFractionDigits: 1 });
+    const rating = summary?.average.toLocaleString(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) ?? "";
     return (
       <a href="#reviews" onClick={(event) => {
         const reviews = document.getElementById("reviews");
@@ -204,16 +233,24 @@ export function ProductRatingInline({ productId, emphasizeAuthenticity = false, 
           history.replaceState(history.state, "", "#reviews");
           reviews.scrollIntoView({ behavior: "smooth" });
         }
-      }} className="flex w-fit flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] font-semibold text-[#6b4a55] hover:text-[#7a1c37] hover:underline">
+      }} className="flex w-fit flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[var(--pdp-muted)] hover:text-[var(--pdp-ink)] hover:underline">
         {!!summary?.total && (
           <>
-            <span className="tracking-widest text-[#7a1c37]" aria-hidden="true">
-              {"★".repeat(Math.round(summary.average))}{"☆".repeat(5 - Math.round(summary.average))}
+            <span className="tracking-wide text-[var(--pdp-ink)]" aria-hidden="true">
+              {compact ? "★" : <>{ "★".repeat(Math.round(summary.average)) }{ "☆".repeat(5 - Math.round(summary.average)) }</>}
             </span>
-            <span>{summary.average.toLocaleString("vi-VN", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}/5 ({summary.total.toLocaleString("vi-VN")} đánh giá)</span>
+            <span>
+              {compact && <span aria-hidden="true">{rating} ({compactNumber.format(summary.total)})</span>}
+              <span className={compact ? "sr-only" : undefined}>{tOffer("ratingCount", { rating, count: summary.total })}</span>
+            </span>
           </>
         )}
-        {!!sold && <span>{summary?.total ? "· " : ""}Đã bán {sold.toLocaleString("vi-VN")}</span>}
+        {sampleSummary && !previewSold && sampleLabel}
+        {!!summary?.total && !!displayedSales && <span aria-hidden="true">·</span>}
+        {!!displayedSales && (
+          <span>{tOffer("soldCount", { count: compact ? compactNumber.format(displayedSales) : displayedSales.toLocaleString(locale) })}</span>
+        )}
+        {!!previewSold && sampleLabel}
       </a>
     );
   }

@@ -3,7 +3,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect, useCallback } from "react";
 import { useLocale, useTranslations } from "next-intl";
@@ -34,6 +34,8 @@ import { formatPrice, cn } from "@/lib/utils";
 import { AddressBook } from "@/components/checkout/address-book";
 import { VoucherPickerDialog } from "@/components/checkout/voucher-picker-dialog";
 import { ZaloLoginDialog } from "@/components/auth/zalo-login-dialog";
+import { productActivityQueryOptions } from "@/components/storefront/product-urgency";
+import { getAuriaRepricedProductSlug } from "@/lib/auria-product-offers";
 
 const checkoutSchema = z.object({
   customerName: z.string().min(1, "Name is required"),
@@ -104,6 +106,7 @@ export default function CheckoutPage() {
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
   const [isZaloLoginOpen, setIsZaloLoginOpen] = useState(false);
   const [hasPromptedZaloLogin, setHasPromptedZaloLogin] = useState(false);
+  const [bundlePricesUpdated, setBundlePricesUpdated] = useState(false);
 
   const {
     data: savedAddresses = [],
@@ -183,6 +186,29 @@ export default function CheckoutPage() {
   const clearCart = useCartStore((s) => s.clearCart);
   const updateQuantity = useCartStore((s) => s.updateQuantity);
   const removeItem = useCartStore((s) => s.removeItem);
+  const syncPrices = useCartStore((s) => s.syncPrices);
+  const bundleSlugs = Array.from(new Set(cartItems.map(getAuriaRepricedProductSlug).filter((slug) => slug !== undefined)));
+  const bundleQueries = bundleSlugs.map((slug) => productActivityQueryOptions(slug));
+  const { bundlePrices, isPending, isError, isFetching } = useQueries({
+    queries: isMounted ? bundleQueries : [],
+    combine: (results) => ({
+      bundlePrices: Object.assign({}, ...results.map((result) => result.data?.prices)) as Record<string, number>,
+      isPending: results.some((result) => result.isPending),
+      isError: results.some((result) => result.isError),
+      isFetching: results.some((result) => result.isFetching),
+    }),
+  });
+  const hasStaleBundlePrice = cartItems.some((item) =>
+    bundlePrices[item.variantId] !== undefined && bundlePrices[item.variantId] !== item.price);
+  const isCheckingBundlePrices = isPending || hasStaleBundlePrice;
+  const refreshBundlePrices = () => Promise.all(bundleQueries.map(({ queryKey }) =>
+    queryClient.invalidateQueries({ queryKey, exact: true })));
+
+  useEffect(() => {
+    if (!isMounted || !hasStaleBundlePrice) return;
+    syncPrices(bundlePrices);
+    setBundlePricesUpdated(true);
+  }, [bundlePrices, hasStaleBundlePrice, isMounted, syncPrices]);
 
   useEffect(() => { setIsMounted(true); }, []);
 
@@ -229,7 +255,7 @@ export default function CheckoutPage() {
   const totalCartQuantity = cartItems.reduce((acc, item) => acc + item.quantity, 0);
 
   const { data: shippingQueryResult, isLoading: isCalculatingShipping } = useQuery({
-    queryKey: ["shipping-fee", selectedCarrier, provinceKey, districtKey, wardKey, totalCartQuantity, isCod],
+    queryKey: ["shipping-fee", selectedCarrier, provinceKey, districtKey, wardKey, totalCartQuantity, isCod, subtotal],
     queryFn: async () => {
       if (!canCalculateShipping) {
         return { fee: 0, carrier: selectedCarrier };
@@ -438,7 +464,27 @@ export default function CheckoutPage() {
           shippingParams,
         }),
       });
-      if (!response.ok) throw new Error("Failed to place order");
+      if (!response.ok) {
+        const failure = await response.json().catch(() => null);
+        if (response.status === 409 && failure?.code === "BUNDLE_PRICE_CHANGED") {
+          if (failure.prices) {
+            syncPrices(failure.prices);
+            for (const { queryKey } of bundleQueries) {
+              queryClient.setQueryData(queryKey, (previous) => {
+                if (!previous) return previous;
+                const prices = Object.fromEntries(
+                  Object.entries(previous.prices).map(([id, price]) => [id, failure.prices[id] ?? price]),
+                );
+                return { ...previous, prices };
+              });
+            }
+          }
+          setBundlePricesUpdated(true);
+          void refreshBundlePrices();
+          throw new Error(t("bundlePricesUpdated"));
+        }
+        throw new Error("Failed to place order");
+      }
       return response.json();
     },
     onSuccess: (data) => {
@@ -469,7 +515,7 @@ export default function CheckoutPage() {
   ];
 
   const onSubmit = (data: CheckoutFormValues) => {
-    if (cartItems.length === 0) return;
+    if (cartItems.length === 0 || isCheckingBundlePrices) return;
     mutation.mutate(data);
   };
 
@@ -564,6 +610,7 @@ export default function CheckoutPage() {
 
   const isCheckoutActionDisabled =
     mutation.isPending ||
+    isCheckingBundlePrices ||
     isLoadingAddresses ||
     isLoadingCarriers ||
     isCarrierError ||
@@ -596,6 +643,16 @@ export default function CheckoutPage() {
 
 
       <form onSubmit={handleSubmit(onSubmit)}>
+        {bundleSlugs.length > 0 && (isError || bundlePricesUpdated) && (
+          <div role="status" className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 text-sm text-primary">
+            <span>{t(isError ? "bundlePricesError" : "bundlePricesUpdated")}</span>
+            {isError && (
+              <Button type="button" variant="outline" onClick={() => void refreshBundlePrices()} disabled={isFetching}>
+                {t("retryBundlePrices")}
+              </Button>
+            )}
+          </div>
+        )}
         {/* Hidden inputs */}
         <input type="hidden" {...register("customerName")} />
         <input type="hidden" {...register("customerPhone")} />

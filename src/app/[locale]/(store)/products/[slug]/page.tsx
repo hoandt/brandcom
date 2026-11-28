@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
+import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { ProductClient } from "./product-client";
+import { createReviewPreview } from "./review-preview.server";
 import type { Metadata } from "next";
 import { brandConfig } from "@/lib/brand-config";
 import { marked } from "marked";
@@ -9,9 +11,12 @@ import { getTranslations } from "next-intl/server";
 import { getStoreSettings } from "@/lib/store-settings";
 import { storefrontCache } from "@/lib/storefront-cache";
 import { getProductPromotion } from "@/lib/product-promotion.server";
+import { hasLiveBundlePrices } from "@/lib/auria-product-offers";
+import palette from "@/components/storefront/product-palette.module.css";
 
 type Props = {
   params: Promise<{ locale: string; slug: string }>;
+  searchParams: Promise<{ preview?: string | string[] }>;
 };
 
 async function markdownToPlainText(input?: string | null): Promise<string> {
@@ -34,9 +39,11 @@ function truncateMetaDescription(text: string, maxLength = 160): string {
   return `${(lastSpace > 80 ? sliced.slice(0, lastSpace) : sliced).trim()}…`;
 }
 
-async function getProduct(slug: string) {
+const getProduct = cache(async (slug: string) => {
   const settings = await getStoreSettings();
-  return storefrontCache(`product:${slug}`, settings.productCacheSeconds, () =>
+  // Render the current repriced bundle prices in the initial HTML and product metadata.
+  const cacheSeconds = hasLiveBundlePrices(slug) ? 0 : settings.productCacheSeconds;
+  return storefrontCache(`product:${slug}`, cacheSeconds, () =>
     prisma.product.findUnique({
       where: { slug },
       include: {
@@ -54,7 +61,7 @@ async function getProduct(slug: string) {
       },
     })
   );
-}
+});
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale, slug } = await params;
@@ -109,8 +116,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function ProductPage({ params }: Props) {
+export default async function ProductPage({ params, searchParams }: Props) {
   const { locale, slug } = await params;
+  const reviewPreview = process.env.NODE_ENV === "development" && (await searchParams).preview !== "off"
+    ? createReviewPreview() : undefined;
 
   const product = await getProduct(slug);
 
@@ -126,7 +135,7 @@ export default async function ProductPage({ params }: Props) {
     }),
     getTranslations("Product"),
     getTranslations("Navbar"),
-    locale === "vi" ? getProductPromotion(slug) : null,
+    getProductPromotion(slug),
   ]);
   const categoryPath = product.categories
     .map((category) => getCategoryPath(allCategories, category.id))
@@ -232,10 +241,9 @@ export default async function ProductPage({ params }: Props) {
       item: item.href ? `${siteUrl}${item.href}` : productUrl,
     })),
   };
-
   return (
-    <div className="min-h-screen bg-background selection:bg-primary/20">
-      <div className="w-full lg:container lg:mx-auto lg:max-w-[1440px] lg:px-8 lg:pt-6">
+    <div className={`${palette.theme} ${palette.quiet} min-h-screen bg-background selection:bg-border`}>
+      <div className={`${palette.productContainer} pt-3 lg:pt-7`}>
         {/* Schema.org / JSON-LD for Search Engines & AI Bots */}
         <script
           type="application/ld+json"
@@ -245,9 +253,9 @@ export default async function ProductPage({ params }: Props) {
         <ProductClient
           key={product.id}
           promotion={promotion}
+          reviewPreview={reviewPreview}
           currency={currency}
           ratingSummary={{ total: reviewCount, average: averageRating ?? 0 }}
-          lowStockThreshold={settings.lowStockThreshold}
           product={{
             id: product.id,
             name: product.name,
@@ -259,14 +267,12 @@ export default async function ProductPage({ params }: Props) {
               sku: v.sku,
               name: v.name,
               stock: v.stock,
-              isActive: v.isActive,
               price: Number(v.price),
               comparePrice: v.comparePrice ? Number(v.comparePrice) : null,
               imageUrl: v.imageUrl,
             })),
           }}
           details={{
-            summary: truncateMetaDescription(plainOverview, 200),
             description: compiledDescription,
             overview: compiledOverview,
             materials: compiledMaterials,

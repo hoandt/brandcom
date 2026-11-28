@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 import { uploadFileToR2 } from "@/lib/r2";
 import { slugify } from "@/lib/slugify";
 import { revalidatePath, revalidateTag } from "next/cache";
-import { invalidateProductsListCache } from "../route";
+import { adminProductCache, invalidateAdminProductCache, invalidateProductsListCache } from "@/lib/admin-catalog-cache";
 import { invalidateStorefrontCache } from "@/lib/storefront-cache";
 
 async function authorized() {
@@ -31,25 +31,13 @@ type SubmittedVariant = {
   imageUrl?: string | null;
 };
 
-// Simple in-memory cache for GET /api/admin/products/[productId]
-const productCache = new Map<string, { data: any; timestamp: number }>();
 const CACHE_TTL_MS = 30_000;
-
-export function invalidateAdminProductCache(productId?: string) {
-  if (productId) {
-    productCache.delete(productId);
-  } else {
-    productCache.clear();
-  }
-}
-
-
 
 export async function GET(_req: Request, { params }: { params: Promise<{ productId: string }> }) {
   if (!(await authorized())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { productId } = await params;
 
-  const cached = productCache.get(productId);
+  const cached = adminProductCache.get(productId);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
     return NextResponse.json(cached.data);
   }
@@ -119,7 +107,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ product
     },
   };
 
-  productCache.set(productId, { data: result, timestamp: Date.now() });
+  adminProductCache.set(productId, { data: result, timestamp: Date.now() });
   return NextResponse.json(result);
 }
 

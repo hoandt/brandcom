@@ -29,10 +29,6 @@ async function authorized() {
 let categoriesCache: { data: any; timestamp: number } | null = null;
 const CACHE_TTL_MS = 60_000;
 
-export function invalidateCategoriesCache() {
-  categoriesCache = null;
-}
-
 export async function GET() {
   if (!(await authorized())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 

@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import { allocateInventory } from "@/lib/inventory";
 import { getStoreSettings } from "@/lib/store-settings";
 import { sendNewOrderNotification } from "@/lib/order-notification";
+import { AURIA_REPRICED_PRODUCT_SLUGS } from "@/lib/auria-product-offers";
 
 const checkoutSchema = z.object({
   customerName: z.string().min(1, "Name is required"),
@@ -46,6 +47,22 @@ export async function POST(req: Request) {
 
     // Validate the incoming request body
     const validatedData = checkoutSchema.parse(body);
+    const repricedBundles = await prisma.productVariant.findMany({
+      where: {
+        id: { in: validatedData.items.map((item) => item.variantId) },
+        product: { slug: { in: [...AURIA_REPRICED_PRODUCT_SLUGS] } },
+      },
+      select: { id: true, price: true },
+    });
+    if (repricedBundles.length) {
+      const prices = Object.fromEntries(repricedBundles.map((variant) => [variant.id, Number(variant.price)]));
+      const priceChanged = validatedData.items.some((item) =>
+        prices[item.variantId] !== undefined && prices[item.variantId] !== item.price);
+      const itemSubtotal = validatedData.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+      if (priceChanged || Math.abs(itemSubtotal - validatedData.subtotal) > 0.001) {
+        return NextResponse.json({ success: false, code: "BUNDLE_PRICE_CHANGED", prices }, { status: 409 });
+      }
+    }
 
     // Get session to attach userId if logged in
     const session = await auth();

@@ -18,6 +18,7 @@ type CartState = {
   addItem: (item: CartItem) => void;
   removeItem: (variantId: string) => void;
   updateQuantity: (variantId: string, quantity: number) => void;
+  syncPrices: (prices: Record<string, number>) => void;
   replaceOne: (oldVariantId: string, replacement: CartItem, maxQuantity: number) => boolean;
   clearCart: () => void;
 };
@@ -35,7 +36,7 @@ export const useCartStore = create<CartState>()(
             return {
               items: state.items.map((i) =>
                 i.variantId === item.variantId
-                  ? { ...i, quantity: i.quantity + item.quantity }
+                  ? { ...i, price: item.price, quantity: i.quantity + item.quantity }
                   : i
               ),
             };
@@ -52,6 +53,17 @@ export const useCartStore = create<CartState>()(
             i.variantId === variantId ? { ...i, quantity } : i
           ),
         })),
+      syncPrices: (prices) =>
+        set((state) => {
+          let changed = false;
+          const items = state.items.map((item) => {
+            const price = prices[item.variantId];
+            if (!Number.isFinite(price) || price < 0 || price === item.price) return item;
+            changed = true;
+            return { ...item, price };
+          });
+          return changed ? { items } : state;
+        }),
       replaceOne: (oldVariantId, replacement, maxQuantity) => {
         if (oldVariantId === replacement.variantId) return false;
         const { items } = get();
